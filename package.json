@@ -1,0 +1,21 @@
+{
+	"name" : "wenzisha server",
+	"version" : "0.1.0",
+	"author" : "Terry King <terrykingcha@gmail.com>",
+	"description" : "wenzisha server",
+	"keywords" :[
+		"wenzisha"
+	],
+	"license" : "MIT",
+	"repository" : 
+	{
+		"type" : "git",
+		"url" : "git@github.com:ShaTeam/wenzisha_server.git"
+	},
+	"dependencies" : 
+	{
+		"log4js" : "0.5.x",
+		"express" : "3.x"
+	},
+	"main" : "./index.js"
+}
