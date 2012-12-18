@@ -1,5 +1,38 @@
-var datas = require('../datas')
+var datas = require('../datas'),
+	RES_CODE = {
+		OK : 0,
+		ERROR : 1
+	},
+
+	RES_REASON = {
+		NO_ROOM : 1 << 0,
+		NO_PLAYER : 1 << 1,
+		FULL_ROOM : 1 << 2,
+		UNKNOW : 1 << 10
+	}
 	;
+
+
+function no_room_error(req, res) {
+	res.json({
+		code : RES_CODE.ERROR,
+		reason : RES_REASON.NO_ROOM
+	});
+}
+
+function full_room_error(req, res) {
+	res.json({
+		code : RES_CODE.ERROR,
+		reason : RES_REASON.FULL_ROOM
+	});
+}
+
+function no_player_error(req, res) {
+	res.json({
+		code : RES_CODE.ERROR,
+		reason : RES_REASON.NO_PLAYER,
+	});
+}
 
 /**
  * @query {number} playerCount
@@ -8,23 +41,30 @@ var datas = require('../datas')
 function openRoom(req, res) {
 	var query = req.query,
 		playerCount = query.playerCount,
-		roomId, adminId
+		roomId, adminId, 
+		startTimestamp, endTimestamp
 		;
 
-	for (var i = 0; i < Math.pow(10, 9); i++) {
-		i;
+	startTimestamp = Date.now();
+
+	function ok() {
+		endTimestamp = Date.now();
+
+		res.json({
+			code : RES_CODE.OK,
+			roomId : roomId,
+			adminId : adminId,
+			startTimestamp : startTimestamp,
+			endTimestamp : endTimestamp
+		});
 	}
 
 	datas.createRoom(playerCount, function(id) {
 		roomId = id;
 
-		datas.createAdmin(roomId, function(id) {
+		datas.createPlayer(roomId, true, function(id) {
 			adminId = id;
-
-			res.json({
-				roomId : roomId,
-				adminId : adminId
-			});
+			ok();
 		});
 	});
 }
@@ -32,10 +72,61 @@ function openRoom(req, res) {
 
 /**
  * @query {number} roomId
- * @return {playerCount : [number], palyerId : [nunber]}
+ * @query {number=} playerId
+ * @return {playerAmount : [number], playerId : [nunber], roomId : [number]}
  */
 function joinRoom(req, res) {
+	var query = req.query,
+		roomId = query.roomId,
+		playerId = query.playerId,
+		playerAmount,
+		startTimestamp, endTimestamp
+		;
 
+	startTimestamp = Date.now();
+
+	function ok() {
+		endTimestamp = Date.now();
+
+		res.json({
+			code : RES_CODE.OK,
+			playerId : playerId,
+			playerAmount : playerAmount,
+			roomId : roomId,
+			startTimestamp : startTimestamp,
+			endTimestamp : endTimestamp
+		});
+	}
+
+	datas.hasRoom(roomId, function(hasRoom) {
+		if (hasRoom) {
+
+			datas.isRoomFull(roomId, playerId, function(isFull) {
+				if (isFull) {
+					full_room_error(req, res);
+				} else if (playerId) {
+					datas.hasPlayer(playerId, function(hasPlayer) {
+						if (hasPlayer) {
+							datas.joinRoom(roomId, playerId, function(id, amount) {
+								playerAmount = amount;
+								ok();
+							});
+						} else {
+							no_player_error(req, res);
+						}
+					});
+				} else {
+					datas.createPlayer(roomId, false, function(id, amount) {
+						playerId = id;
+						playerAmount = amount;
+						ok();
+					});
+				}
+			});
+		} else {
+			no_room_error(req, res);
+		}
+	})
 }
 
 
@@ -105,5 +196,6 @@ function endGame() {
 }
 
 module.exports = {
-	'open-room' : openRoom
+	'open-room' : openRoom,
+	'join-room' : joinRoom
 }
