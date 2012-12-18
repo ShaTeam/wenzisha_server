@@ -6,7 +6,27 @@ var datas = require('../datas')
  * @return {roomId : [number], adminId : [nunber]}
  */
 function openRoom(req, res) {
-	
+	var query = req.query,
+		playerCount = query.playerCount,
+		roomId, adminId
+		;
+
+	datas.createRoom(playerCount, function(id) {
+		roomId = id;
+
+		// res.json({
+		// 	roomId : roomId
+		// });
+
+		datas.createAdmin(roomId, function(id) {
+			adminId = id;
+
+			res.json({
+				roomId : roomId,
+				adminId : adminId
+			});
+		});
+	});
 }
 
 

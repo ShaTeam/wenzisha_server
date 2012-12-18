@@ -1,5 +1,6 @@
 var express = require('express'),
-	app = express()
+	app = express(),
+	port = 88
 	;
 
 app.use(express.logger());
@@ -7,13 +8,12 @@ app.use(express.logger());
 app.get('/:name/:action/', function(req, res, next) {
 	var name = req.params.name,
 		action = req.params.action,
-		controller = require('./src/apis/' + name),
-		result = controller[action](req, res)
+		controller = require('./src/apis/' + name)
 		;
 
-
 	res.set('Content-Type', 'text/plain; charset=utf-8');
-	res.send(JSON.stringify(result));
+	controller[action](req, res);
 });
 
-app.listen(88);
+app.listen(port);
+console.log('start at port ' + port);
