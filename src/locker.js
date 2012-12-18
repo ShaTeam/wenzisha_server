@@ -31,29 +31,38 @@ function Locker(id, data) {
 
 Locker.prototype.lockRead = function(callback) {
 	var that = this,
+		args = arguments,
 		readLocker = that._readLocker
 		;
 
 	if (that._mode === READ_LOCK)  {
 		cb();
 	} else {
-		fs.open(readLocker, 'wx', function(err, fd) {
+		// fs.open(readLocker, 'wx', function(err, fd) {
+		// 	if (err) throw err;
+
+		// 	that._readLockerFd = fd;
+		// 	that._mode = READ_LOCK;
+		// 	that._reading++;
+		// 	callback.call(that, that._data);
+		// });
+
+		if (lockfile.checkSync(readLocker)) {
+			process.nextTick(function() {
+				args.callee.apply(that, args);
+			})
+			return;
+		}
+
+		lockfile.lock(readLocker, {
+			wait : LOCK_WAIT
+		}, function(err, fd) {
 			if (err) throw err;
 
-			that._readLockerFd = fd;
 			that._mode = READ_LOCK;
 			that._reading++;
 			callback.call(that, that._data);
 		});
-
-		// lockfile.lock(readLocker, {
-		// 	wait : LOCK_WAIT
-		// }, function(err, fd) {
-		// 	if (err) throw err;
-
-		// 	that._mode = READ_LOCK;
-		// 	cb();
-		// });
 	}
 }
 
@@ -66,63 +75,71 @@ Locker.prototype.unlockRead = function(callback) {
 	if (that._mode !== READ_LOCK) 
 		throw new Error('can\'t unlock under non-lock or write-lock mode');
 
-	that._reading--;
+	if ((that._reading--) > 0) return;
 
-	if (that._reading > 0) return;
-
-	fs.unlink(readLocker, function(err) {
-		if (err) throw err;
-
-		fs.close(readLockerFd, function(err) {
-			if (err) throw err;
-
-			that._readLockerFd = null;
-			that._mode = NON_LOCK;
-			callback.call(that);
-		});
-	});
-
-	// lockfile.unlock(readLocker, function(err) {
+	// fs.unlink(readLocker, function(err) {
 	// 	if (err) throw err;
 
-	// 	that._mode = NON_LOCK;
-	// });	
+	// 	fs.close(readLockerFd, function(err) {
+	// 		if (err) throw err;
+
+	// 		that._readLockerFd = null;
+	// 		that._mode = NON_LOCK;
+	// 		callback.call(that);
+	// 	});
+	// });
+
+	lockfile.unlock(readLocker, function(err) {
+		if (err) throw err;
+
+		that._mode = NON_LOCK;
+		callback.call(that);
+	});	
 }
 
 Locker.prototype.lockWrite = function(callback) {
 	var that = this,
+		args = arguments,
 		readLocker = that._readLocker,
 		writeLocker = that._writeLocker
 		;
 
-	fs.open(readLocker, 'wx', function(err, fd) {
+	// fs.open(readLocker, 'wx', function(err, fd) {
+	// 	if (err) throw err;
+		
+	// 	that._readLockerFd = fd;
+
+	// 	fs.open(writeLocker, 'wx', function(err, fd) {
+	// 		if (err) throw err;
+
+	// 		that._writeLockerFd = fd;
+	// 		that._mode = WRITE_LOCK;
+	// 		callback.call(that, that._data);
+	// 	});
+	// });
+
+	if (lockfile.checkSync(readLocker) ||
+			lockfile.checkSync(writeLocker)) {
+		process.nextTick(function() {
+			args.callee.apply(that, args);
+		});
+		return
+	}
+
+	lockfile.lock(readLocker, {
+		wait : LOCK_WAIT
+	}, function(err, fd) {
 		if (err) throw err;
 		
-		that._readLockerFd = fd;
-
-		fs.open(writeLocker, 'wx', function(err, fd) {
+		lockfile.lock(writeLocker, {
+			wait : LOCK_WAIT
+		}, function(err, fd) {
 			if (err) throw err;
 
-			that._writeLockerFd = fd;
 			that._mode = WRITE_LOCK;
 			callback.call(that, that._data);
 		});
 	});
-
-	// lockfile.lock(readLocker, {
-	// 	wait : LOCK_WAIT
-	// }, function(err, fd) {
-	// 	if (err) throw err;
-		
-	// 	lockfile.lock(writeLocker, {
-	// 		wait : LOCK_WAIT
-	// 	}, function(err, fd) {
-	// 		if (err) throw err;
-
-	// 		that._mode = WRITE_LOCK;
-	// 		callback.call(that, that._data, done);
-	// 	});
-	// });
 }
 
 Locker.prototype.unlockWrite = function(callback) {
@@ -136,38 +153,39 @@ Locker.prototype.unlockWrite = function(callback) {
 	if (that._mode !== WRITE_LOCK) 
 		throw new Error('can\'t unlock under non-lock or read-lock mode');
 
-	fs.unlink(writeLocker, function(err) {
-		if (err) throw err;
-
-		fs.close(writeLockerFd, function(err) {
-			if (err) throw err;
-
-			that._writeLockerFd = null;
-
-			fs.unlink(readLocker, function(err) {
-				if (err) throw err;
-
-				that._readLockerFd = null;
-
-				fs.close(readLockerFd, function(err) {
-					if (err) throw err;
-
-					that._mode = NON_LOCK;
-					callback.call(that);
-				});
-			});	
-		});
-	});
-
-	// lockfile.unlock(writeLocker, function(err) {
+	// fs.unlink(writeLocker, function(err) {
 	// 	if (err) throw err;
 
-	// 	lockfile.unlock(readLocker, function(err) {
+	// 	fs.close(writeLockerFd, function(err) {
 	// 		if (err) throw err;
 
-	// 		that._mode = NON_LOCK;
-	// 	});	
+	// 		that._writeLockerFd = null;
+
+	// 		fs.unlink(readLocker, function(err) {
+	// 			if (err) throw err;
+
+	// 			that._readLockerFd = null;
+
+	// 			fs.close(readLockerFd, function(err) {
+	// 				if (err) throw err;
+
+	// 				that._mode = NON_LOCK;
+	// 				callback.call(that);
+	// 			});
+	// 		});	
+	// 	});
 	// });
+
+	lockfile.unlock(writeLocker, function(err) {
+		if (err) throw err;
+
+		lockfile.unlock(readLocker, function(err) {
+			if (err) throw err;
+
+			that._mode = NON_LOCK;
+			callback.call(that);
+		});	
+	});
 }
 
 Locker.prototype.getData = function() {

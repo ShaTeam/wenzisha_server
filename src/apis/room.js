@@ -11,12 +11,12 @@ function openRoom(req, res) {
 		roomId, adminId
 		;
 
+	for (var i = 0; i < Math.pow(10, 9); i++) {
+		i;
+	}
+
 	datas.createRoom(playerCount, function(id) {
 		roomId = id;
-
-		// res.json({
-		// 	roomId : roomId
-		// });
 
 		datas.createAdmin(roomId, function(id) {
 			adminId = id;
