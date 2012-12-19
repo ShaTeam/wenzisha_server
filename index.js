@@ -3,9 +3,11 @@ var express = require('express'),
 	port = 88
 	;
 
+require('./src/libs/reset');
+
 app.use(express.logger());
 
-app.get('/:name/:action/', function(req, res, next) {
+app.get('/:name/:action/?', function(req, res, next) {
 	var name = req.params.name,
 		action = req.params.action,
 		controller = require('./src/apis/' + name)

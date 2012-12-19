@@ -1,72 +1,65 @@
-var datas = require('../datas'),
-	RES_CODE = {
-		OK : 0,
-		ERROR : 1
-	},
-
-	RES_REASON = {
-		NO_ROOM : 1 << 0,
-		NO_PLAYER : 1 << 1,
-		FULL_ROOM : 1 << 2,
-		UNKNOW : 1 << 10
-	}
+var Sequence = require('../libs/sequence'),
+	rooms = require('../datas/rooms'),
+	players = require('../datas/players'),
+	Result = require('./result')
 	;
-
-
-function no_room_error(req, res) {
-	res.json({
-		code : RES_CODE.ERROR,
-		reason : RES_REASON.NO_ROOM
-	});
-}
-
-function full_room_error(req, res) {
-	res.json({
-		code : RES_CODE.ERROR,
-		reason : RES_REASON.FULL_ROOM
-	});
-}
-
-function no_player_error(req, res) {
-	res.json({
-		code : RES_CODE.ERROR,
-		reason : RES_REASON.NO_PLAYER,
-	});
-}
 
 /**
  * @query {number} playerCount
  * @return {roomId : [number], adminId : [nunber]}
  */
-function openRoom(req, res) {
-	var query = req.query,
+exports.open = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
 		playerCount = query.playerCount,
-		roomId, adminId, 
-		startTimestamp, endTimestamp
+		roomId, adminId,
+		seq
 		;
 
-	startTimestamp = Date.now();
-
-	function ok() {
-		endTimestamp = Date.now();
-
-		res.json({
-			code : RES_CODE.OK,
+	function done() {
+		result.ok({
 			roomId : roomId,
-			adminId : adminId,
-			startTimestamp : startTimestamp,
-			endTimestamp : endTimestamp
+			adminId : adminId
 		});
 	}
 
-	datas.createRoom(playerCount, function(id) {
-		roomId = id;
+	seq = new Sequence(done);
 
-		datas.createPlayer(roomId, true, function(id) {
-			adminId = id;
-			ok();
+	seq.push(function craeteRoom() {
+		rooms.create(playerCount, function(id) {
+			roomId = id;
+
+			seq.next();
 		});
 	});
+
+	seq.push(function createPlayer() {
+		players.create(true, function(id) {
+			adminId = id;
+
+			seq.next();
+		});
+	});
+
+	seq.push(function joinRoom() {
+		rooms.join(roomId, adminId, function() {
+			seq.next();
+		});
+	});
+
+	seq.push(function setPlayerRoom() {
+		players.setRoomId(adminId, roomId, function() {
+			seq.next();
+		});
+	});
+
+	seq.push(function setPlayerStatus() {
+		players.setStatus(adminId, players.STATUS.GAME, function() {
+			seq.done();
+		})
+	});
+
+	seq.next();
 }
 
 
@@ -75,74 +68,166 @@ function openRoom(req, res) {
  * @query {number=} playerId
  * @return {playerAmount : [number], playerId : [nunber], roomId : [number]}
  */
-function joinRoom(req, res) {
-	var query = req.query,
+exports.join = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
 		roomId = query.roomId,
 		playerId = query.playerId,
 		playerAmount,
-		startTimestamp, endTimestamp
+		seq
 		;
 
-	startTimestamp = Date.now();
-
-	function ok() {
-		endTimestamp = Date.now();
-
-		res.json({
-			code : RES_CODE.OK,
+	function done() {
+		result.ok({
 			playerId : playerId,
 			playerAmount : playerAmount,
-			roomId : roomId,
-			startTimestamp : startTimestamp,
-			endTimestamp : endTimestamp
+			roomId : roomId
 		});
 	}
 
-	datas.hasRoom(roomId, function(hasRoom) {
-		if (hasRoom) {
+	function exit(errorName) {
+		result[errorName]();
+	}
 
-			datas.isRoomFull(roomId, playerId, function(isFull) {
-				if (isFull) {
-					full_room_error(req, res);
-				} else if (playerId) {
-					datas.hasPlayer(playerId, function(hasPlayer) {
-						if (hasPlayer) {
-							datas.joinRoom(roomId, playerId, function(id, amount) {
-								playerAmount = amount;
-								ok();
-							});
-						} else {
-							no_player_error(req, res);
-						}
-					});
-				} else {
-					datas.createPlayer(roomId, false, function(id, amount) {
-						playerId = id;
-						playerAmount = amount;
-						ok();
-					});
-				}
-			});
-		} else {
-			no_room_error(req, res);
-		}
-	})
+	seq = new Sequence(done, exit);
+
+	seq.push(function checkIfHasRoom() {
+		rooms.has(roomId, function(hasRoom) {
+			if (hasRoom) {
+				seq.next();
+			} else {
+				seq.exit('no_room_error');
+			}
+		});
+	});
+
+	seq.push(function checkIfFullRoom() {
+		rooms.isFull(roomId, playerId, function(isFull) {
+			if (isFull) {
+				seq.exit('full_room_error');				
+			} else if (playerId){
+				seq.next();
+			} else {
+				seq.nextElse();
+			}
+		});
+	});
+
+	seq.push(function checkIfHasPlayer() {
+		players.has(playerId, function(hasPlayer) {
+			if (hasPlayer) {
+				seq.next();
+			} else {
+				seq.exit('no_player_error');
+			}
+		});		
+	}, function createPlayer() {
+		players.create(false, function(id) {
+			playerId = id;
+
+			seq.next();
+		});		
+	});
+
+	seq.push(function joinRoom() {
+		rooms.join(roomId, playerId, function(amount) {
+			playerAmount = amount;
+			
+			seq.next();		
+		});
+	});
+
+	seq.push(function setPlayerRoom() {
+		players.setRoomId(playerId, roomId, function() {
+			seq.next();
+		});
+	});
+
+	seq.push(function setPlayerStatus() {
+		players.setStatus(playerId, players.STATUS.GAME, function() {
+			seq.done();
+		})
+	});
+
+	seq.next();
 }
 
 
 /**
  * @query {number} roomId
  * @query {number} adminId
- * @return {roomId : [number], 
- 			playerCount : [number], 
- 			status : [number], 
- 			words : [Array], 
- 			goodGuys : [number], 
-			badGuys : [number],
-			idiots : [number]
- 			}
+ * @return {players : [Array]}
  */
-function getRoom(req, res) {
+exports['get'] = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
+		roomId = query.roomId,
+		adminId = query.adminId,
+		room,
+		seq
+		;
+
+	function done() {
+		result.ok(room);
+	}
+
+	function exit(errorName) {
+		result[errorName]();
+	}
+
+	seq = new Sequence(done, exit);
+
+	seq.push(function checkIfIsAdmin() {
+		players.isAdmin(adminId, function(is) {
+			if (is) {
+				seq.next();
+			} else {
+				seq.exit('not_admin_error');
+			}
+		});
+	});
+
+	seq.push(function checkIfHasRoom() {
+		rooms.has(roomId, function(hasRoom) {
+			if (hasRoom) {
+				seq.next();
+			} else {
+				seq.exit('no_room_error');
+			}
+		});
+	});
+
+	seq.push(function getPlayers() {
+		rooms.get(roomId, function(_room) {
+			var playersRef = _room.playersRef,
+				playerList = _room.playerList = [];
+
+			room = _room;
+			room.playerList = [];
+
+			if (playersRef.indexOf(adminId) < 0) {
+				seq.exit('no_permission_error');
+			} else {
+				Object.each(playersRef, function(playerId, index) {
+					seq.push(function () {
+						players.get(playerId, function(player) {
+							playerList.push(player);
+
+							if (index < playersRef.length - 1) {
+								seq.next();
+							} else {
+								seq.done();
+							}
+						});
+					});
+				});
+
+				seq.next();
+			}
+		});
+	});
+
+	seq.next();
 
 }
 
@@ -150,9 +235,59 @@ function getRoom(req, res) {
 /**
  * @query {number} roomId
  * @query {number} playerId
- * @return {players : [Array]}
+ * @return {playerAmount : [number]}
  */
-function getPalyers(req, res) {
+exports['get-amount'] = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
+		roomId = query.roomId,
+		playerId = query.playerId,
+		playerAmount,
+		seq
+		;
+
+	function done() {
+		result.ok({
+			playerAmount : playerAmount
+		});
+	}
+
+	function exit(errorName) {
+		result[errorName]();
+	}
+
+	seq = new Sequence(done, exit);
+
+	seq.push(function checkIfHasRoom() {
+		rooms.has(roomId, function(hasRoom) {
+			if (hasRoom) {
+				seq.next();
+			} else {
+				seq.exit('no_room_error');
+			}
+		});
+	});
+
+	seq.push(function getPlayerAmount() {
+		rooms.getPlayers(roomId, function(playerCount, playersRef) {
+			if (playersRef.indexOf(playerId) < 0) {
+				seq.exit('no_permission_error');
+			} else {
+				playerAmount = playersRef.length;
+				seq.done();
+			}
+		});
+	});
+
+	seq.next();
+}
+
+/**
+ * @query {number} roomId
+ * @query {number} adminId
+ * @return {}
+ */
+exports['get-puzzle'] = function(req, res) {
 
 }
 
@@ -162,7 +297,7 @@ function getPalyers(req, res) {
  * @query {number} adminId
  * @return {}
  */
-function setPuzzle(req, res) {
+exports['set-puzzle'] = function(req, res) {
 
 }
 
@@ -171,7 +306,7 @@ function setPuzzle(req, res) {
  * @query {number} adminId
  * @return {puzzle: [Array]}
  */
-function randomPuzzle(req, res) {
+exports['random-puzzle'] = function(req, res) {
 
 }
 
@@ -181,7 +316,7 @@ function randomPuzzle(req, res) {
  * @query {number} adminId
  * @return {status: [number]}
  */
-function startGame() {
+exports['start-game'] = function() {
 
 }
 
@@ -191,11 +326,6 @@ function startGame() {
  * @query {number} adminId
  * @return {status: [number]}
  */
-function endGame() {
+exports['end-game'] = function() {
 
-}
-
-module.exports = {
-	'open-room' : openRoom,
-	'join-room' : joinRoom
 }

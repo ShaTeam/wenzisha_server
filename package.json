@@ -16,7 +16,6 @@
 	{
 		"log4js" : "0.5.x",
 		"express" : "3.x",
-		"lockfile" : "0.2.x",
 		"uuid-js" : "0.7.x"
 	},
 	"main" : "./index.js"
