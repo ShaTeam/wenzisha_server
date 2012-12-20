@@ -3,6 +3,7 @@ function Sequence(done, exit) {
 		;
 
 	that._list = [];
+	that._data = {};
 	that._doneCb = done;
 	that._exitCb = exit;
 }
@@ -15,62 +16,69 @@ Sequence.prototype.push = function(func, funcElse) {
 	list.push([func, funcElse]);
 }
 
-Sequence.prototype.next = function() {
-	var args = Array.make(arguments),
-		that = this,
-		list = that._list,
-		func = list.shift()
+function _next(_data, func) {
+	var that = this,
+		data = that._data
 		;
 
-	if (func[0]) {
-		func[0].apply(that, args);
+	_data && Object.extend(data, _data);
+
+	if (func) {
+		func.call(that, data);
 		return true;
 	} else {
 		return false;
 	}
 }
 
-Sequence.prototype.nextElse = function() {
-	var args = Array.make(arguments),
-		that = this,
+Sequence.prototype.next = function(_data) {
+	var that = this,
 		list = that._list,
 		func = list.shift()
 		;
 
-	if (func[1]) {
-		func[1].apply(that, args);
-		return true;
-	} else {
-		return false;
+	return _next.call(that, _data, func[0]);
+}
+
+Sequence.prototype.nextElse = function(_data) {
+	var that = this,
+		list = that._list,
+		func = list.shift()
+		;
+
+	return _next.call(that, _data, func[1]);
+}
+
+function _end(_data, func) {
+	var that = this,
+		list = that._list,
+		data = that._data
+		;
+
+	_data && Object.extend(data, _data);
+
+	list.splice(0);
+	that._data = {};
+
+	if (func) {
+		func.call(that, data);
 	}
 }
 
-Sequence.prototype.done = function() {
-	var args = Array.make(arguments),
-		that = this,
-		list = that._list,
+Sequence.prototype.done = function(_data) {
+	var that = this,
 		doneCb = that._doneCb
 		;
 
-	list = [];
-
-	if (doneCb) {
-		doneCb.apply(that, args);
-	}
+	_end.call(that, _data, doneCb);
 }
 
-Sequence.prototype.exit = function() {
-	var args = Array.make(arguments),
-		that = this,
-		list = that._list,
+Sequence.prototype.exit = function(_data) {
+	var that = this,
 		exitCb = that._exitCb
 		;
 
-	list = [];
-
-	if (exitCb) {
-		exitCb.apply(that, args);
-	}
+	_end.call(that, _data, exitCb);
 }
 
 module.exports = Sequence;

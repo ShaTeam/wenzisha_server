@@ -4,6 +4,188 @@ var Sequence = require('../libs/sequence'),
 	Result = require('./result')
 	;
 
+
+function createRoom(data) {
+	var seq = this,
+		playerCount = data.playerCount
+		;
+
+	rooms.create(playerCount, function(roomId) {
+		seq.next({
+			roomId : roomId
+		});
+	});
+}
+
+function createPlayer(data) {
+	var seq = this,
+		isAdmin = data.isAdmin
+		;
+
+	players.create(isAdmin, function(playerId) {
+		seq.next({
+			playerId : playerId
+		});
+	});
+}
+
+function joinRoom(data) {
+	var seq = this,
+		roomId = data.roomId,
+		playerId = data.playerId
+		;
+
+	rooms.join(roomId, playerId, function(playerAmount) {
+		seq.next({
+			playerAmount : playerAmount
+		});
+	});
+}
+
+function setPlayerRoom(data) {
+	var seq = this,
+		playerId = data.playerId,
+		roomId = data.roomId
+		;
+
+	players.setRoomId(playerId, roomId, function() {
+		seq.next();
+	});
+}
+
+function setPlayerStatus(data) {
+	var seq = this,
+		playerId = data.playerId
+		;
+
+	players.setStatus(playerId, players.STATUS.GAME, function() {
+		seq.next();
+	})
+}
+
+function checkIfHasRoom(data) {
+	var seq = this,
+		roomId = data.roomId
+		;
+
+	rooms.has(roomId, function(hasRoom) {
+		if (hasRoom) {
+			seq.next();
+		} else {
+			seq.exit({error : 'no_room_error'});
+		}
+	});
+}
+
+function checkIfFullRoom(data) {
+	var seq = this,
+		roomId = data.roomId,
+		playerId = data.playerId
+		;
+
+	rooms.isFull(roomId, playerId, function(isFull) {
+		if (isFull) {
+			seq.exit({error : 'full_room_error'});				
+		} else if (playerId){
+			seq.next();
+		} else {
+			seq.nextElse();
+		}
+	});
+}
+
+function checkIfHasPlayer(data) {
+	var seq = this,
+		playerId = data.playerId
+		;
+
+	players.has(playerId, function(hasPlayer) {
+		if (hasPlayer) {
+			seq.next();
+		} else {
+			seq.exit({error : 'no_player_error'});
+		}
+	});		
+}
+
+function checkIfIsAdmin(data) {
+	var seq = this,
+		playerId = data.playerId
+		;
+
+	players.isAdmin(playerId, function(is) {
+		if (is) {
+			seq.next();
+		} else {
+			seq.exit({error : 'not_admin_error'});
+		}
+	});
+}
+
+function getRoom(data) {
+	var seq = this,
+		roomId = data.roomId
+		;
+
+	rooms.get(roomId, function(room) {
+		seq.next({room : room});
+	});
+}
+
+function getPlayer(data) {
+	var seq = this,
+		playerId = data.playerId
+		;
+
+	players.get(playerId, function(player) {
+		seq.next({playerId : player});
+	});
+}
+
+function getPlayers(data) {
+	var seq = this,
+		room = data.room,
+		playersRef = room.playersRef,
+		subSeq
+		;
+
+
+
+
+	if (playersRef.indexOf(playerId) < 0) {
+		seq.exit({error : 'no_permission_error'});
+	} else {
+		// Object.each(playersRef, function(pid, index) {
+		// 	seq.jump(function (data) {
+		// 		var playerList = data.playerList
+		// 			;
+
+		// 		players.get(pid, function(player) {
+		// 			playerList.push(player);
+		// 			console.log(playerList);
+		// 			seq.next({playerList : playerList});
+		// 		});
+		// 	});
+		// });
+
+		seq.next({
+			playerList : []
+		});
+	}
+}
+
+function getPlayerAmount() {
+	rooms.getPlayers(roomId, function(playerCount, playersRef) {
+		if (playersRef.indexOf(playerId) < 0) {
+			seq.exit('no_permission_error');
+		} else {
+			playerAmount = playersRef.length;
+			seq.done();
+		}
+	});
+}
+
+
 /**
  * @query {number} playerCount
  * @return {roomId : [number], adminId : [nunber]}
@@ -11,55 +193,37 @@ var Sequence = require('../libs/sequence'),
 exports.open = function(req, res) {
 	var result = new Result(req, res),
 		query = req.query,
-		playerCount = query.playerCount,
-		roomId, adminId,
+		data = {
+			playerCount : query.playerCount,
+			isAdmin : true,
+			roomId : null,
+			playerId : null
+		},
 		seq
 		;
 
-	function done() {
+	function done(data) {
 		result.ok({
-			roomId : roomId,
-			adminId : adminId
+			roomId : data.roomId,
+			adminId : data.playerId
 		});
 	}
 
 	seq = new Sequence(done);
 
-	seq.push(function craeteRoom() {
-		rooms.create(playerCount, function(id) {
-			roomId = id;
+	seq.push(createRoom);
 
-			seq.next();
-		});
-	});
+	seq.push(createPlayer);
 
-	seq.push(function createPlayer() {
-		players.create(true, function(id) {
-			adminId = id;
+	seq.push(joinRoom);
 
-			seq.next();
-		});
-	});
+	seq.push(setPlayerRoom);
 
-	seq.push(function joinRoom() {
-		rooms.join(roomId, adminId, function() {
-			seq.next();
-		});
-	});
+	seq.push(setPlayerStatus);
 
-	seq.push(function setPlayerRoom() {
-		players.setRoomId(adminId, roomId, function() {
-			seq.next();
-		});
-	});
+	seq.push(seq.done);
 
-	seq.push(function setPlayerStatus() {
-		players.setStatus(adminId, players.STATUS.GAME, function() {
-			seq.done();
-		})
-	});
-
-	seq.next();
+	seq.next(data);
 }
 
 
@@ -71,85 +235,45 @@ exports.open = function(req, res) {
 exports.join = function(req, res) {
 	var result = new Result(req, res),
 		query = req.query,
-		roomId = query.roomId,
-		playerId = query.playerId,
-		playerAmount,
+		data = {
+			roomId : query.roomId,
+			playerId : query.playerId,
+			playerAmount : null,
+			isAdmin : false
+		},
 		seq
 		;
 
-	function done() {
+	function done(data) {
 		result.ok({
-			playerId : playerId,
-			playerAmount : playerAmount,
-			roomId : roomId
+			playerAmount : data.playerAmount,
+			playerId : data.playerId,
+			roomId : data.roomId
 		});
 	}
 
-	function exit(errorName) {
-		result[errorName]();
+	function exit(data) {
+		var error = data.error;
+		result[error]();
 	}
 
 	seq = new Sequence(done, exit);
 
-	seq.push(function checkIfHasRoom() {
-		rooms.has(roomId, function(hasRoom) {
-			if (hasRoom) {
-				seq.next();
-			} else {
-				seq.exit('no_room_error');
-			}
-		});
-	});
+	seq.push(checkIfHasRoom);
 
-	seq.push(function checkIfFullRoom() {
-		rooms.isFull(roomId, playerId, function(isFull) {
-			if (isFull) {
-				seq.exit('full_room_error');				
-			} else if (playerId){
-				seq.next();
-			} else {
-				seq.nextElse();
-			}
-		});
-	});
+	seq.push(checkIfFullRoom);
 
-	seq.push(function checkIfHasPlayer() {
-		players.has(playerId, function(hasPlayer) {
-			if (hasPlayer) {
-				seq.next();
-			} else {
-				seq.exit('no_player_error');
-			}
-		});		
-	}, function createPlayer() {
-		players.create(false, function(id) {
-			playerId = id;
+	seq.push(checkIfHasPlayer, createPlayer);
 
-			seq.next();
-		});		
-	});
+	seq.push(joinRoom);
 
-	seq.push(function joinRoom() {
-		rooms.join(roomId, playerId, function(amount) {
-			playerAmount = amount;
-			
-			seq.next();		
-		});
-	});
+	seq.push(setPlayerRoom);
 
-	seq.push(function setPlayerRoom() {
-		players.setRoomId(playerId, roomId, function() {
-			seq.next();
-		});
-	});
+	seq.push(setPlayerStatus);
 
-	seq.push(function setPlayerStatus() {
-		players.setStatus(playerId, players.STATUS.GAME, function() {
-			seq.done();
-		})
-	});
+	seq.push(seq.done);
 
-	seq.next();
+	seq.next(data);
 }
 
 
@@ -161,73 +285,39 @@ exports.join = function(req, res) {
 exports['get'] = function(req, res) {
 	var result = new Result(req, res),
 		query = req.query,
-		roomId = query.roomId,
-		adminId = query.adminId,
-		room,
+		data = {
+			roomId : query.roomId,
+			playerId : query.adminId,
+			room : null
+		},
 		seq
 		;
 
-	function done() {
-		result.ok(room);
+	function done(data) {
+		result.ok({
+			room : data.room,
+			playerList : data.playerList
+		});
 	}
 
-	function exit(errorName) {
-		result[errorName]();
+	function exit(error) {
+		var error = data.error
+			;
+
+		result[error]();
 	}
 
 	seq = new Sequence(done, exit);
 
-	seq.push(function checkIfIsAdmin() {
-		players.isAdmin(adminId, function(is) {
-			if (is) {
-				seq.next();
-			} else {
-				seq.exit('not_admin_error');
-			}
-		});
-	});
+	seq.push(checkIfIsAdmin);
 
-	seq.push(function checkIfHasRoom() {
-		rooms.has(roomId, function(hasRoom) {
-			if (hasRoom) {
-				seq.next();
-			} else {
-				seq.exit('no_room_error');
-			}
-		});
-	});
+	seq.push(checkIfHasRoom);
 
-	seq.push(function getPlayers() {
-		rooms.get(roomId, function(_room) {
-			var playersRef = _room.playersRef,
-				playerList = _room.playerList = [];
+	seq.push(getPlayers);
 
-			room = _room;
-			room.playerList = [];
+	seq.push(seq.done);
 
-			if (playersRef.indexOf(adminId) < 0) {
-				seq.exit('no_permission_error');
-			} else {
-				Object.each(playersRef, function(playerId, index) {
-					seq.push(function () {
-						players.get(playerId, function(player) {
-							playerList.push(player);
-
-							if (index < playersRef.length - 1) {
-								seq.next();
-							} else {
-								seq.done();
-							}
-						});
-					});
-				});
-
-				seq.next();
-			}
-		});
-	});
-
-	seq.next();
+	seq.next(data);
 
 }
 
@@ -240,46 +330,36 @@ exports['get'] = function(req, res) {
 exports['get-amount'] = function(req, res) {
 	var result = new Result(req, res),
 		query = req.query,
-		roomId = query.roomId,
-		playerId = query.playerId,
-		playerAmount,
+		data = {
+			roomId : query.roomId,
+			playerId : query.playerId,
+			playerAmount : null
+		},
 		seq
 		;
 
-	function done() {
+	function done(data) {
 		result.ok({
-			playerAmount : playerAmount
+			playerAmount : data.playerAmount
 		});
 	}
 
-	function exit(errorName) {
-		result[errorName]();
+	function exit(data) {
+		var error = data.error
+			;
+
+		result[error]();
 	}
 
 	seq = new Sequence(done, exit);
 
-	seq.push(function checkIfHasRoom() {
-		rooms.has(roomId, function(hasRoom) {
-			if (hasRoom) {
-				seq.next();
-			} else {
-				seq.exit('no_room_error');
-			}
-		});
-	});
+	seq.push(checkIfHasRoom);
 
-	seq.push(function getPlayerAmount() {
-		rooms.getPlayers(roomId, function(playerCount, playersRef) {
-			if (playersRef.indexOf(playerId) < 0) {
-				seq.exit('no_permission_error');
-			} else {
-				playerAmount = playersRef.length;
-				seq.done();
-			}
-		});
-	});
+	seq.push(getPlayerAmount);
 
-	seq.next();
+	seq.push(seq.done);
+
+	seq.next(data);
 }
 
 /**
