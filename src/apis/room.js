@@ -17,18 +17,6 @@ function createRoom(data) {
 	});
 }
 
-function createPlayer(data) {
-	var seq = this,
-		isAdmin = data.isAdmin
-		;
-
-	players.create(isAdmin, function(playerId) {
-		seq.next({
-			playerId : playerId
-		});
-	});
-}
-
 function joinRoom(data) {
 	var seq = this,
 		roomId = data.roomId,
@@ -42,26 +30,6 @@ function joinRoom(data) {
 	});
 }
 
-function setPlayerRoom(data) {
-	var seq = this,
-		playerId = data.playerId,
-		roomId = data.roomId
-		;
-
-	players.setRoomId(playerId, roomId, function() {
-		seq.next();
-	});
-}
-
-function setPlayerStatus(data) {
-	var seq = this,
-		playerId = data.playerId
-		;
-
-	players.setStatus(playerId, players.STATUS.GAME, function() {
-		seq.next();
-	})
-}
 
 function checkIfHasRoom(data) {
 	var seq = this,
@@ -86,12 +54,135 @@ function checkIfFullRoom(data) {
 	rooms.isFull(roomId, playerId, function(isFull) {
 		if (isFull) {
 			seq.exit({error : 'full_room_error'});				
-		} else if (playerId){
-			seq.next();
 		} else {
-			seq.nextElse();
+			seq.next();
 		}
 	});
+}
+
+function checkIfHasPlayerId(data) {
+	var seq = this,
+		playerId = data.playerId
+		;
+
+	if (playerId){
+		seq.next();
+	} else {
+		seq.nextElse();
+	}
+}
+
+function getPlayersRef(data) {
+	var seq = this,
+		roomId = data.roomId,
+		playerId = data.playerId
+		;
+
+	rooms.getPlayers(roomId, function(playerCount, playersRef) {
+		if (playerId && playersRef.indexOf(playerId) < 0) {
+			seq.exit('no_permission_error');
+		} else {
+			seq.next({
+				playersRef : playersRef
+			});
+		}
+	});
+}
+
+function getPlayerAmount(data) {
+	var seq = this,
+		playersRef = data.playersRef
+		;
+
+	seq.next({
+		playerAmount : playersRef.length
+	});
+}
+
+function getRoomStatus(data) {
+	var seq = this,
+		roomId = data.roomId
+		;
+
+	rooms.getStatus(roomId, function(status) {
+		seq.next({
+			status : status
+		});
+	});
+}
+
+function setRoomStatus(data) {
+	var seq = this,
+		roomId = data.roomId,
+		status = data.status
+		;
+
+	rooms.setStatus(roomId, status, function(status) {
+		seq.next();
+	});
+}
+
+function getPlayers(data) {
+	var seq = this,
+		playerId = data.playerId,
+		playersRef = data.playersRef,
+		playerList = data.playerList,
+		subSeq
+		;
+
+	function done(data) {
+		seq.next({
+			playerList : playerList
+		})
+	}
+
+	subSeq = new Sequence(done);
+
+	Object.each(playersRef, function(playerId, index) {
+		subSeq.push(getPlayer, {playerId : playerId});
+
+		subSeq.push(function(data) {
+			playerList.push(data.player);
+			subSeq.next();
+		})
+	});
+
+	subSeq.push(subSeq.done);
+	
+	subSeq.next();
+}
+
+function createPlayer(data) {
+	var seq = this,
+		isAdmin = data.isAdmin
+		;
+
+	players.create(isAdmin, function(playerId) {
+		seq.next({
+			playerId : playerId
+		});
+	});
+}
+
+function setPlayerRoom(data) {
+	var seq = this,
+		playerId = data.playerId,
+		roomId = data.roomId
+		;
+
+	players.setRoomId(playerId, roomId, function() {
+		seq.next();
+	});
+}
+
+function setPlayerStatus(data) {
+	var seq = this,
+		playerId = data.playerId
+		;
+
+	players.setStatus(playerId, players.STATUS.GAME, function() {
+		seq.next();
+	})
 }
 
 function checkIfHasPlayer(data) {
@@ -134,95 +225,28 @@ function getPlayer(data) {
 	});
 }
 
-function getPlayers(data) {
-	var seq = this,
-		playerId = data.playerId,
-		playersRef = data.playersRef,
-		playerList = data.playerList,
-		subSeq
-		;
-
-	if (playersRef.indexOf(playerId) < 0) {
-		seq.exit({error : 'no_permission_error'});
-	} else {
-		function done(data) {
-			seq.next({
-				playerList : playerList
-			})
-		}
-
-		subSeq = new Sequence(done);
-
-		Object.each(playersRef, function(playerId, index) {
-			subSeq.push(getPlayer, {playerId : playerId});
-
-			subSeq.push(function(data) {
-				playerList.push(data.player);
-				subSeq.next();
-			})
-		});
-
-		subSeq.push(subSeq.done);
-
-		subSeq.next();
-	}
-}
-
-function getPlayersRef(data) {
-	var seq = this,
-		roomId = data.roomId,
-		playerId = data.playerId
-		;
-
-	rooms.getPlayers(roomId, function(playerCount, playersRef) {
-		if (playersRef.indexOf(playerId) < 0) {
-			seq.exit('no_permission_error');
-		} else {
-			seq.next({
-				playersRef : playersRef
-			});
-		}
-	});
-}
-
-function getPlayerAmount(data) {
-	var seq = this,
-		roomId = data.roomId,
-		playerId = data.playerId
-		;
-
-	rooms.getPlayers(roomId, function(playerCount, playersRef) {
-		if (playersRef.indexOf(playerId) < 0) {
-			seq.exit('no_permission_error');
-		} else {
-			seq.next({
-				playerAmount : playersRef.length
-			});
-		}
-	});
-}
-
 
 /**
  * @query {number} playerCount
+ * @query {string=} adminId
  * @query {string}
- * @return {roomId : [number], adminId : [nunber]}
+ * @return {roomId : [number], adminId : [string]}
  */
 exports.open = function(req, res) {
 	var result = new Result(req, res),
 		query = req.query,
 		data = {
 			playerCount : query.playerCount,
+			playerId : query.adminId,
 			isAdmin : true,
 			roomId : null,
-			playerId : null
 		},
 		seq
 		;
 
 	function done(data) {
 		result.ok({
-			roomId : data.roomId,
+			roomId : parseInt(data.roomId),
 			adminId : data.playerId
 		});
 	}
@@ -231,7 +255,9 @@ exports.open = function(req, res) {
 
 	seq.push(createRoom);
 
-	seq.push(createPlayer);
+	seq.push(checkIfHasPlayerId);
+
+	seq.push(checkIfHasPlayer, createPlayer);
 
 	seq.push(joinRoom);
 
@@ -248,13 +274,13 @@ exports.open = function(req, res) {
 /**
  * @query {number} roomId
  * @query {string=} playerId
- * @return {playerAmount : [number], playerId : [nunber], roomId : [number]}
+ * @return {playerAmount : [number], playerId : [string], roomId : [string]}
  */
 exports.join = function(req, res) {
 	var result = new Result(req, res),
 		query = req.query,
 		data = {
-			roomId : query.roomId,
+			roomId : parseInt(query.roomId),
 			playerId : query.playerId,
 			playerAmount : null,
 			isAdmin : false
@@ -264,9 +290,9 @@ exports.join = function(req, res) {
 
 	function done(data) {
 		result.ok({
-			playerAmount : data.playerAmount,
+			playerAmount : parseInt(data.playerAmount),
 			playerId : data.playerId,
-			roomId : data.roomId
+			roomId : parseInt(data.roomId)
 		});
 	}
 
@@ -280,6 +306,8 @@ exports.join = function(req, res) {
 	seq.push(checkIfHasRoom);
 
 	seq.push(checkIfFullRoom);
+
+	seq.push(checkIfHasPlayerId);
 
 	seq.push(checkIfHasPlayer, createPlayer);
 
@@ -298,7 +326,7 @@ exports.join = function(req, res) {
 /**
  * @query {number} roomId
  * @query {string} adminId
- * @return {players : [Array]}
+ * @return {playerList : [Array]}
  */
 exports['get-players'] = function(req, res) {
 	var result = new Result(req, res),
@@ -359,7 +387,7 @@ exports['get-amount'] = function(req, res) {
 
 	function done(data) {
 		result.ok({
-			playerAmount : data.playerAmount
+			playerAmount : parseInt(data.playerAmount)
 		});
 	}
 
@@ -374,6 +402,8 @@ exports['get-amount'] = function(req, res) {
 
 	seq.push(checkIfHasRoom);
 
+	seq.push(getPlayersRef);
+
 	seq.push(getPlayerAmount);
 
 	seq.push(seq.done);
@@ -384,19 +414,80 @@ exports['get-amount'] = function(req, res) {
 /**
  * @query {number} roomId
  * @query {string} playerId
- * @return {playerAmount : [number]}
+ * @return {status : [number]}
  */
 exports['get-status'] = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
+		data = {
+			roomId : query.roomId,
+			playerId : query.playerId,
+			status : null
+		},
+		seq
+		;
 
+	function done(data) {
+		result.ok({
+			status : parseInt(data.status)
+		});
+	}
+
+	function exit(data) {
+		var error = data.error
+			;
+
+		result[error]();
+	}
+
+	seq = new Sequence(done, exit);
+
+	seq.push(checkIfHasRoom);
+
+	seq.push(getRoomStatus);
+
+	seq.push(seq.done);
+
+	seq.next(data);
 }
 
 /**
  * @query {number} roomId
  * @query {string} adminId
+ * @query {number} status
  * @return {}
  */
-exports['get-puzzle'] = function(req, res) {
+exports['set-status'] = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
+		data = {
+			roomId : query.roomId,
+			playerId : query.adminId,
+			status : query.status
+		},
+		seq
+		;
 
+	function done(data) {
+		result.ok();
+	}
+
+	function exit(data) {
+		var error = data.error
+			;
+
+		result[error]();
+	}
+
+	seq = new Sequence(done, exit);
+
+	seq.push(checkIfHasRoom);
+
+	seq.push(setRoomStatus);
+
+	seq.push(seq.done);
+
+	seq.next(data);
 }
 
 
@@ -426,5 +517,13 @@ exports['start-game'] = function() {
  * @return {status: [number]}
  */
 exports['end-game'] = function() {
+
+}
+
+/**
+ * @query {number} roomId
+ * @query {string} playerId
+ */
+exports['exit'] = function() {
 
 }

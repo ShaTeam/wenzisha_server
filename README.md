@@ -22,11 +22,12 @@
 ### rooms/open
 
 * @query {number} playerCount
+* @query {string=} adminId
 * @return
 	* @param {number} roomId
 	* @param {string} adminId
 
-新开房间
+新开房间，如果不提供adminId，则创建一个管理员
 
 ### rooms/join
 
@@ -34,10 +35,10 @@
 * @query {string=} playerId
 * @return
 	* @param {number} roomId
-	* @param {number} playerId
+	* @param {string} playerId
 	* @param {number} playerAmount
 
-加入房间
+加入房间，如不提供playerId，则创建一个玩家，并返回房间的当前人数
 
 ### rooms/get-players
 
@@ -46,7 +47,7 @@
 * @return
 	* @param {Array} playerList
 
-获取房间的加入人数
+（管理员权限）获取房间的玩家列表
 
 ### rooms/get-amount
 
@@ -55,4 +56,21 @@
 * @return
 	* @param {number} playerAmount
 
-获取房间的加入人数
+获取房间的玩家数
+
+### rooms/get-status
+
+* @query {number} roomId
+* @query {string} playerId
+* @return
+	* @param {number} status
+
+获取房间的状态
+
+### rooms/set-status
+
+* @query {number} roomId
+* @query {string} adminId
+* @query {status} status
+
+（管理员权限）设置房间的状态

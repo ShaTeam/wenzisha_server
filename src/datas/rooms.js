@@ -191,7 +191,7 @@ exports.setStatus = function(roomId, status, callback) {
 	}, callback);
 }
 
-exports.getStatus = function(roomId, status, callback) {
+exports.getStatus = function(roomId, callback) {
 	var that = this;
 
 	_get.call(that, 
