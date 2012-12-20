@@ -65,7 +65,7 @@ function checkIfHasPlayerId(data) {
 		playerId = data.playerId
 		;
 
-	if (playerId){
+	if (playerId) {
 		seq.next();
 	} else {
 		seq.nextElse();
@@ -255,9 +255,11 @@ exports.open = function(req, res) {
 
 	seq.push(createRoom);
 
-	seq.push(checkIfHasPlayerId);
-
-	seq.push(checkIfHasPlayer, createPlayer);
+	seq.push({
+		func : checkIfHasPlayer, 
+		funcElse : createPlayer,
+		condition : !!data.playerId
+	});
 
 	seq.push(joinRoom);
 
@@ -307,9 +309,11 @@ exports.join = function(req, res) {
 
 	seq.push(checkIfFullRoom);
 
-	seq.push(checkIfHasPlayerId);
-
-	seq.push(checkIfHasPlayer, createPlayer);
+	seq.push({
+		func : checkIfHasPlayer,
+		funcElse : createPlayer,
+		condition : !!data.playerId
+	});
 
 	seq.push(joinRoom);
 

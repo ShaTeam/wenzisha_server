@@ -10,16 +10,24 @@ function Sequence(done, exit) {
 
 Sequence.prototype.push = function(func, funcElse, data) {
 	var that = this,
-		list = that._list
+		list = that._list,
+		opt = {}
 		;
 
-	if (arguments.length === 2 &&
+	if (arguments.length === 1 && 
+			!Object.isTypeof(func, 'function')) {
+		opt = func;
+	} else if (arguments.length === 2 &&
 			!Object.isTypeof(funcElse, 'function')) {
-		data = funcElse;
-		funcElse = null
+		opt.func = func;
+		opt.data = funcElse;
+	} else {
+		opt.func = func;
+		opt.funcElse = funcElse;
+		opt.data = data;
 	}
 
-	list.push([func, funcElse, data]);
+	list.push(opt);
 }
 
 function _next(_data, func) {
@@ -27,36 +35,46 @@ function _next(_data, func) {
 		data = that._data
 		;
 
-	_data && Object.extend(data, _data);
+	Object.extend(data, _data);
 
 	if (func) {
 		func.call(that, data);
 		return true;
-	} else {
-		return false;
 	}
 }
 
-Sequence.prototype.next = function(data) {
+Sequence.prototype.next = function(_data) {
 	var that = this,
 		list = that._list,
-		element = list.shift(),
-		func = element[0],
-		_data = element[2] || {}
+		opt = list.shift(),
+		func = opt.func,
+		condition = opt.condition,
+		data = opt.data || {},
+		type = Object.isTypeof(condition)
 		;
 
-	return _next.call(that, Object.extend(_data, data), func);
+	Object.extend(data, _data);
+
+	if ((type === 'function' && 
+		!condition.call(that, data)) || 
+		(type !== 'undefined' && !condition)) {
+		func = opt.funcElse;
+	}
+
+	return _next.call(that, data, func);
 }
 
-Sequence.prototype.nextElse = function(data) {
+Sequence.prototype.nextElse = function(_data) {
 	var that = this,
 		list = that._list,
-		element = list.shift(),
-		func = element[1],
-		_data = element[2] || {}
+		opt = list.shift(),
+		func = opt.funcElse || opt.func,
+		data = opt.data || {}
 		;
 
-	return _next.call(that, Object.extend(_data, data), func);
+	Object.extend(data, _data);
+
+	return _next.call(that, data, func);
 }
 
 function _end(_data, func) {
