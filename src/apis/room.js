@@ -122,65 +122,82 @@ function checkIfIsAdmin(data) {
 	});
 }
 
-function getRoom(data) {
-	var seq = this,
-		roomId = data.roomId
-		;
-
-	rooms.get(roomId, function(room) {
-		seq.next({room : room});
-	});
-}
-
 function getPlayer(data) {
 	var seq = this,
 		playerId = data.playerId
 		;
 
 	players.get(playerId, function(player) {
-		seq.next({playerId : player});
+		seq.next({
+			player : player
+		});
 	});
 }
 
 function getPlayers(data) {
 	var seq = this,
-		room = data.room,
-		playersRef = room.playersRef,
+		playerId = data.playerId,
+		playersRef = data.playersRef,
+		playerList = data.playerList,
 		subSeq
 		;
-
-
-
 
 	if (playersRef.indexOf(playerId) < 0) {
 		seq.exit({error : 'no_permission_error'});
 	} else {
-		// Object.each(playersRef, function(pid, index) {
-		// 	seq.jump(function (data) {
-		// 		var playerList = data.playerList
-		// 			;
+		function done(data) {
+			seq.next({
+				playerList : playerList
+			})
+		}
 
-		// 		players.get(pid, function(player) {
-		// 			playerList.push(player);
-		// 			console.log(playerList);
-		// 			seq.next({playerList : playerList});
-		// 		});
-		// 	});
-		// });
+		subSeq = new Sequence(done);
 
-		seq.next({
-			playerList : []
+		Object.each(playersRef, function(playerId, index) {
+			subSeq.push(getPlayer, {playerId : playerId});
+
+			subSeq.push(function(data) {
+				playerList.push(data.player);
+				subSeq.next();
+			})
 		});
+
+		subSeq.push(subSeq.done);
+
+		subSeq.next();
 	}
 }
 
-function getPlayerAmount() {
+function getPlayersRef(data) {
+	var seq = this,
+		roomId = data.roomId,
+		playerId = data.playerId
+		;
+
 	rooms.getPlayers(roomId, function(playerCount, playersRef) {
 		if (playersRef.indexOf(playerId) < 0) {
 			seq.exit('no_permission_error');
 		} else {
-			playerAmount = playersRef.length;
-			seq.done();
+			seq.next({
+				playersRef : playersRef
+			});
+		}
+	});
+}
+
+function getPlayerAmount(data) {
+	var seq = this,
+		roomId = data.roomId,
+		playerId = data.playerId
+		;
+
+	rooms.getPlayers(roomId, function(playerCount, playersRef) {
+		if (playersRef.indexOf(playerId) < 0) {
+			seq.exit('no_permission_error');
+		} else {
+			seq.next({
+				playerAmount : playersRef.length
+			});
 		}
 	});
 }
@@ -188,6 +205,7 @@ function getPlayerAmount() {
 
 /**
  * @query {number} playerCount
+ * @query {string}
  * @return {roomId : [number], adminId : [nunber]}
  */
 exports.open = function(req, res) {
@@ -229,7 +247,7 @@ exports.open = function(req, res) {
 
 /**
  * @query {number} roomId
- * @query {number=} playerId
+ * @query {string=} playerId
  * @return {playerAmount : [number], playerId : [nunber], roomId : [number]}
  */
 exports.join = function(req, res) {
@@ -279,23 +297,22 @@ exports.join = function(req, res) {
 
 /**
  * @query {number} roomId
- * @query {number} adminId
+ * @query {string} adminId
  * @return {players : [Array]}
  */
-exports['get'] = function(req, res) {
+exports['get-players'] = function(req, res) {
 	var result = new Result(req, res),
 		query = req.query,
 		data = {
 			roomId : query.roomId,
 			playerId : query.adminId,
-			room : null
+			playerList : []
 		},
 		seq
 		;
 
 	function done(data) {
 		result.ok({
-			room : data.room,
 			playerList : data.playerList
 		});
 	}
@@ -313,6 +330,8 @@ exports['get'] = function(req, res) {
 
 	seq.push(checkIfHasRoom);
 
+	seq.push(getPlayersRef);
+
 	seq.push(getPlayers);
 
 	seq.push(seq.done);
@@ -324,7 +343,7 @@ exports['get'] = function(req, res) {
 
 /**
  * @query {number} roomId
- * @query {number} playerId
+ * @query {string} playerId
  * @return {playerAmount : [number]}
  */
 exports['get-amount'] = function(req, res) {
@@ -364,7 +383,16 @@ exports['get-amount'] = function(req, res) {
 
 /**
  * @query {number} roomId
- * @query {number} adminId
+ * @query {string} playerId
+ * @return {playerAmount : [number]}
+ */
+exports['get-status'] = function(req, res) {
+
+}
+
+/**
+ * @query {number} roomId
+ * @query {string} adminId
  * @return {}
  */
 exports['get-puzzle'] = function(req, res) {
@@ -374,16 +402,7 @@ exports['get-puzzle'] = function(req, res) {
 
 /**
  * @query {number} roomId
- * @query {number} adminId
- * @return {}
- */
-exports['set-puzzle'] = function(req, res) {
-
-}
-
-/**
- * @query {number} roomId
- * @query {number} adminId
+ * @query {string} adminId
  * @return {puzzle: [Array]}
  */
 exports['random-puzzle'] = function(req, res) {
@@ -393,7 +412,7 @@ exports['random-puzzle'] = function(req, res) {
 
 /**
  * @query {number} roomId
- * @query {number} adminId
+ * @query {string} adminId
  * @return {status: [number]}
  */
 exports['start-game'] = function() {
@@ -403,7 +422,7 @@ exports['start-game'] = function() {
 
 /**
  * @query {number} roomId
- * @query {number} adminId
+ * @query {string} adminId
  * @return {status: [number]}
  */
 exports['end-game'] = function() {

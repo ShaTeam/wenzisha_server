@@ -8,12 +8,18 @@ function Sequence(done, exit) {
 	that._exitCb = exit;
 }
 
-Sequence.prototype.push = function(func, funcElse) {
+Sequence.prototype.push = function(func, funcElse, data) {
 	var that = this,
 		list = that._list
 		;
 
-	list.push([func, funcElse]);
+	if (arguments.length === 2 &&
+			!Object.isTypeof(funcElse, 'function')) {
+		data = funcElse;
+		funcElse = null
+	}
+
+	list.push([func, funcElse, data]);
 }
 
 function _next(_data, func) {
@@ -31,22 +37,26 @@ function _next(_data, func) {
 	}
 }
 
-Sequence.prototype.next = function(_data) {
+Sequence.prototype.next = function(data) {
 	var that = this,
 		list = that._list,
-		func = list.shift()
+		element = list.shift(),
+		func = element[0],
+		_data = element[2] || {}
 		;
 
-	return _next.call(that, _data, func[0]);
+	return _next.call(that, Object.extend(_data, data), func);
 }
 
-Sequence.prototype.nextElse = function(_data) {
+Sequence.prototype.nextElse = function(data) {
 	var that = this,
 		list = that._list,
-		func = list.shift()
+		element = list.shift(),
+		func = element[1],
+		_data = element[2] || {}
 		;
 
-	return _next.call(that, _data, func[1]);
+	return _next.call(that, Object.extend(_data, data), func);
 }
 
 function _end(_data, func) {

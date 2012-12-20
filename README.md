@@ -24,14 +24,14 @@
 * @query {number} playerCount
 * @return
 	* @param {number} roomId
-	* @param {number} adminId
+	* @param {string} adminId
 
 新开房间
 
 ### rooms/join
 
 * @query {number} roomId
-* @query {number=} playerId
+* @query {string=} playerId
 * @return
 	* @param {number} roomId
 	* @param {number} playerId
@@ -39,10 +39,19 @@
 
 加入房间
 
+### rooms/get-players
+
+* @query {number} roomId
+* @query {string} adminId
+* @return
+	* @param {Array} playerList
+
+获取房间的加入人数
+
 ### rooms/get-amount
 
 * @query {number} roomId
-* @query {number} playerId
+* @query {string} playerId
 * @return
 	* @param {number} playerAmount
 
