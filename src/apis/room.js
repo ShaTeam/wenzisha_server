@@ -1,6 +1,7 @@
 var Sequence = require('../libs/sequence'),
 	rooms = require('../datas/rooms'),
 	players = require('../datas/players'),
+	puzzles = require('../datas/puzzles'),
 	Result = require('./result')
 	;
 
@@ -58,18 +59,6 @@ function checkIfFullRoom(data) {
 			seq.next();
 		}
 	});
-}
-
-function checkIfHasPlayerId(data) {
-	var seq = this,
-		playerId = data.playerId
-		;
-
-	if (playerId) {
-		seq.next();
-	} else {
-		seq.nextElse();
-	}
 }
 
 function getPlayersRef(data) {
@@ -225,6 +214,16 @@ function getPlayer(data) {
 	});
 }
 
+function getRandomPuzzle() {
+	var seq = this,
+		words = puzzles.words,
+		wordsLen = words.length,
+		index = parseInt(parseInt(Math.random() * 1024) / 7) % wordsLen
+		;
+
+	seq.next({words : words[index]});
+}
+
 
 /**
  * @query {number} playerCount
@@ -251,15 +250,20 @@ exports.open = function(req, res) {
 		});
 	}
 
-	seq = new Sequence(done);
+	function exit(data) {
+		var error = data.error;
+		result[error]();
+	}
 
-	seq.push(createRoom);
+	seq = new Sequence(done, exit);
 
 	seq.push({
 		func : checkIfHasPlayer, 
 		funcElse : createPlayer,
 		condition : !!data.playerId
 	});
+
+	seq.push(createRoom);
 
 	seq.push(joinRoom);
 
@@ -487,6 +491,8 @@ exports['set-status'] = function(req, res) {
 
 	seq.push(checkIfHasRoom);
 
+	seq.push(checkIfIsAdmin);
+
 	seq.push(setRoomStatus);
 
 	seq.push(seq.done);
@@ -498,10 +504,42 @@ exports['set-status'] = function(req, res) {
 /**
  * @query {number} roomId
  * @query {string} adminId
- * @return {puzzle: [Array]}
+ * @return {words: [Array]}
  */
 exports['random-puzzle'] = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
+		data = {
+			roomId : query.roomId,
+			playerId : query.adminId
+		},
+		seq
+		;
 
+	function done(data) {
+		result.ok({
+			words : data.words
+		});
+	}
+
+	function exit(data) {
+		var error = data.error
+			;
+
+		result[error]();
+	}
+
+	seq = new Sequence(done, exit);
+
+	seq.push(checkIfHasRoom);
+
+	seq.push(checkIfIsAdmin);
+
+	seq.push(getRandomPuzzle);
+
+	seq.push(seq.done);
+
+	seq.next(data);
 }
 
 

@@ -6,7 +6,8 @@ var ALIVE_TIME = 24 * 60 * 60 * 1000 * 2,
 	CHARACTER = {
 		GOD : 1,
 		PEOPLE : 2,
-		IDIOT : 3
+		ONI : 3,
+		IDIOT : 4
 	},
 	STATUS = {
 		IDLE : 0,
@@ -66,8 +67,6 @@ function _get(playerId, propNames, callback) {
 		playerLKC = players[playerId],
 		propValues = []
 		;
-
-	console.log(players);
 
 	if (propNames === '*') {
 		playerLKC.lockRead(function(player) {
