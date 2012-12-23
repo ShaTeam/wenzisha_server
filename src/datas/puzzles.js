@@ -25,7 +25,6 @@ module.exports = {
 			;
 
 		return {
-			god : 1,
 			people : avg + (remainder > 0?1:0),
 			oni : avg + (remainder > 1?1:0),
 			idiot : avg,

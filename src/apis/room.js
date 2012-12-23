@@ -5,6 +5,10 @@ var Sequence = require('../libs/sequence'),
 	Result = require('./result')
 	;
 
+function random(len)  {
+	return parseInt(parseInt(Math.random() * 1024) / 7) % len;
+}
+
 
 function createRoom(data) {
 	var seq = this,
@@ -26,7 +30,22 @@ function joinRoom(data) {
 
 	rooms.join(roomId, playerId, function(playerAmount) {
 		seq.next({
-			playerAmount : playerAmount
+			playerAmount : playerAmount,
+			playerStatus : players.STATUS.GAME
+		});
+	});
+}
+
+function exitRoom(data) {
+	var seq = this,
+		roomId = data.roomId,
+		playerId = data.playerId
+		;
+
+	rooms.exit(roomId, playerId, function() {
+		seq.next({
+			roomId : 0,
+			playerStatus : players.STATUS.IDLE
 		});
 	});
 }
@@ -69,14 +88,17 @@ function getPlayersRef(data) {
 
 	rooms.getPlayers(roomId, function(playerCount, playersRef) {
 		if (playerId && playersRef.indexOf(playerId) < 0) {
-			seq.exit('no_permission_error');
+			seq.exit({error : 'no_permission_error'});
 		} else {
 			seq.next({
+				playerCount : playerCount,
 				playersRef : playersRef
 			});
 		}
 	});
 }
+
+var checkIfHasPermission = getPlayersRef;
 
 function getPlayerAmount(data) {
 	var seq = this,
@@ -106,9 +128,117 @@ function setRoomStatus(data) {
 		status = data.status
 		;
 
-	rooms.setStatus(roomId, status, function(status) {
+	rooms.setStatus(roomId, status, function() {
 		seq.next();
 	});
+}
+
+function setRoomWords(data) {
+	var seq = this,
+		roomId = data.roomId,
+		words = data.words
+		;
+
+	rooms.setWords(roomId, words, function() {
+		seq.next();
+	});
+}
+
+function setRoomCharacters(data) {
+	var seq = this,
+		roomId = data.roomId,
+		characters = data.characters
+		;
+
+	rooms.setCharacters(roomId, characters, function() {
+		seq.next();
+	});
+}
+
+function assignCharacter(data) {
+	var seq = this,
+		adminId = data.playerId,
+		playersRef = data.playersRef.splice(0),
+		playerCount = data.playerCount,
+		characters = data.characters,
+		words = data.words,
+		rule = puzzles.rule(playerCount),
+		playerRef, character, word,
+		subSeq
+		;
+
+	Object.each(rule, function(count, character) {
+		characters[character].count = count;
+	})
+
+	function done(data) {
+		seq.next({
+			characters : characters
+		});
+	}
+
+	function pickPlayer() {
+		if (!playersRef.length) return;
+
+		var index = random(playersRef.length),
+			playerRef = playersRef.splice(index, 1)
+			;
+
+		return playerRef;
+	}
+
+	function pickCharacter() {
+		var characters = Object.keys(rule),
+			index = random(characters.length),
+			character = characters[index]
+			;
+
+		if (!(--rule[character])) {
+			delete rule[character];
+		}
+
+		return character;
+	}
+
+	subSeq = new Sequence(done);
+
+	while ((playerRef = pickPlayer())) {
+		if (playerRef == adminId) {
+			character = 'god';
+		} else {
+			character = pickCharacter();
+		}
+
+		characters[character].playersRef.push(playerRef);
+
+		switch(character) {
+			case 'people':
+				word = words[0];
+				break;
+			case 'oni':
+				word = words[0].length + '个字';
+				break;
+			case 'idiot':
+				word = words[1];
+				break;
+			default:
+				word = 'I\'m god';
+				break;
+		}
+
+		subSeq.push(subSeq.next, {
+			playerId : playerRef,
+			character : character,
+			word : word
+		});
+		subSeq.push(setPlayerCharacter);
+		subSeq.push(setPlayerWord);
+	}
+
+	subSeq.push(subSeq.done);
+
+	subSeq.next();
+
 }
 
 function getPlayers(data) {
@@ -166,10 +296,33 @@ function setPlayerRoom(data) {
 
 function setPlayerStatus(data) {
 	var seq = this,
-		playerId = data.playerId
+		playerId = data.playerId,
+		playerStatus = data.playerStatus
 		;
 
-	players.setStatus(playerId, players.STATUS.GAME, function() {
+	players.setStatus(playerId, playerStatus, function() {
+		seq.next();
+	})
+}
+
+function setPlayerCharacter(data) {
+	var seq = this,
+		playerId = data.playerId,
+		character = data.character
+		;
+
+	players.setCharacter(playerId, character, function() {
+		seq.next();
+	})
+}
+
+function setPlayerWord(data) {
+	var seq = this,
+		playerId = data.playerId,
+		word = data.word
+		;
+
+	players.setWord(playerId, word, function() {
 		seq.next();
 	})
 }
@@ -217,8 +370,7 @@ function getPlayer(data) {
 function getRandomPuzzle() {
 	var seq = this,
 		words = puzzles.words,
-		wordsLen = words.length,
-		index = parseInt(parseInt(Math.random() * 1024) / 7) % wordsLen
+		index = random(words.length)
 		;
 
 	seq.next({words : words[index]});
@@ -333,6 +485,48 @@ exports.join = function(req, res) {
 
 /**
  * @query {number} roomId
+ * @query {string} playerId
+ */
+exports.exit = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
+		data = {
+			roomId : query.roomId,
+			playerId : query.playerId
+		},
+		seq
+		;
+
+	function done(data) {
+		result.ok();
+	}
+
+	function exit(data) {
+		var error = data.error;
+		result[error]();
+	}
+
+	seq = new Sequence(done, exit);
+
+	seq.push(checkIfHasRoom);
+
+	seq.push(checkIfHasPermission);
+
+	seq.push(exitRoom);
+
+	seq.push(setPlayerRoom);
+
+	seq.push(setPlayerStatus);
+
+	seq.push(seq.done);
+
+	seq.next(data);
+
+}
+
+
+/**
+ * @query {number} roomId
  * @query {string} adminId
  * @return {playerList : [Array]}
  */
@@ -353,7 +547,7 @@ exports['get-players'] = function(req, res) {
 		});
 	}
 
-	function exit(error) {
+	function exit(data) {
 		var error = data.error
 			;
 
@@ -452,6 +646,8 @@ exports['get-status'] = function(req, res) {
 
 	seq.push(checkIfHasRoom);
 
+	seq.push(checkIfHasPermission);
+
 	seq.push(getRoomStatus);
 
 	seq.push(seq.done);
@@ -489,9 +685,11 @@ exports['set-status'] = function(req, res) {
 
 	seq = new Sequence(done, exit);
 
+	seq.push(checkIfIsAdmin);
+
 	seq.push(checkIfHasRoom);
 
-	seq.push(checkIfIsAdmin);
+	seq.push(checkIfHasPermission);
 
 	seq.push(setRoomStatus);
 
@@ -531,9 +729,11 @@ exports['random-puzzle'] = function(req, res) {
 
 	seq = new Sequence(done, exit);
 
-	seq.push(checkIfHasRoom);
-
 	seq.push(checkIfIsAdmin);
+
+	seq.push(checkIfHasRoom);	
+
+	seq.push(checkIfHasPermission);
 
 	seq.push(getRandomPuzzle);
 
@@ -546,10 +746,71 @@ exports['random-puzzle'] = function(req, res) {
 /**
  * @query {number} roomId
  * @query {string} adminId
- * @return {status: [number]}
+ * @query {string} words
+ * @return {status: [number], characters: [object]}
  */
-exports['start-game'] = function() {
+exports['start-game'] = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
+		data = {
+			roomId : query.roomId,
+			playerId : query.adminId,
+			words : query.words.split(','),
+			characters : {
+				god : {
+					count : 0,
+					playersRef : []
+				},
+				people : {
+					count : 0,
+					playersRef : []
+				},
+				oni : {
+					count : 0,
+					playersRef : []
+				},
+				idiot : {
+					count : 0,
+					playersRef : []
+				}
+			},
+			status : rooms.STATUS.GAME
+		},
+		
+		seq
+		;
 
+	function done(data) {
+		result.ok({
+			status : data.status,
+			characters : data.characters
+		});
+	}
+
+	function exit(data) {
+		var error = data.error;
+		result[error]();
+	}
+
+	seq = new Sequence(done, exit);
+
+	seq.push(checkIfIsAdmin);
+
+	seq.push(checkIfHasRoom);
+
+	seq.push(getPlayersRef);
+
+	seq.push(assignCharacter);
+
+	seq.push(setRoomStatus);
+
+	seq.push(setRoomWords);
+
+	seq.push(setRoomCharacters);
+
+	seq.push(seq.done);
+
+	seq.next(data);
 }
 
 
@@ -558,14 +819,45 @@ exports['start-game'] = function() {
  * @query {string} adminId
  * @return {status: [number]}
  */
-exports['end-game'] = function() {
+exports['end-game'] = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
+		data = {
+			roomId : query.roomId,
+			playerId : query.adminId,
+			words : null,
+			character : null,
+			status : rooms.STATUS.IDLE
+		},
+		seq
+		;
 
-}
+	function done(data) {
+		result.ok({
+			status : data.status
+		});
+	}
 
-/**
- * @query {number} roomId
- * @query {string} playerId
- */
-exports['exit'] = function() {
+	function exit(data) {
+		var error = data.error;
+		result[error]();
+	}
 
+	seq = new Sequence(done, exit);
+
+	seq.push(checkIfIsAdmin);
+
+	seq.push(checkIfHasRoom);
+
+	seq.push(checkIfHasPermission);
+
+	seq.push(setRoomStatus);
+
+	seq.push(setRoomWords);
+	
+	seq.push(setRoomCharacters);
+
+	seq.push(seq.done);
+
+	seq.next(data);
 }

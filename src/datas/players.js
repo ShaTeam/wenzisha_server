@@ -68,6 +68,11 @@ function _get(playerId, propNames, callback) {
 		propValues = []
 		;
 
+	if (!playerLKC) {
+		callback.call(that, null);
+		return;
+	}
+
 	if (propNames === '*') {
 		playerLKC.lockRead(function(player) {
 			playerLKC.unlockRead(function() {
@@ -99,6 +104,11 @@ function _set(playerId, props, callback) {
 		players = playersLCK.getData(),
 		playerLKC = players[playerId]
 		;
+
+	if (!playerLKC) {
+		callback.call(that, null);
+		return;
+	}
 
 	playerLKC.lockWrite(function(player) {
 		Object.each(props, function(value, name) {

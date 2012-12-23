@@ -20,7 +20,8 @@ exports.create = function(playerCount, callback) {
 			playerCount : playerCount,
 			playersRef : [],
 			status : STATUS.OPENED,
-			puzzle : null,
+			words : null,
+			characters : null,
 			createdTime : Date.now()
 		},
 		roomId
@@ -119,10 +120,16 @@ function _get(roomId, propNames, callback) {
 		propValues = []
 		;
 
+	if (!roomsLCK) {
+		callback.call(that, null);
+		return;
+	}
+
+
 	if (propNames === '*') {
 		roomLCK.lockRead(function(room) {
 			roomLCK.unlockRead(function() {
-				callback(Object.clone(room));
+				callback.call(that, Object.clone(room));
 			})
 		});
 	} else {
@@ -150,6 +157,11 @@ function _set(roomId, props, callback) {
 		rooms = roomsLCK.getData(),
 		roomLCK = rooms[roomId]
 		;
+
+	if (!roomsLCK) {
+		callback.call(that, null);
+		return;
+	}
 
 	roomLCK.lockWrite(function(room) {
 		Object.each(props, function(value, name) {
@@ -201,20 +213,38 @@ exports.getStatus = function(roomId, callback) {
 	);
 }
 
-exports.setPuzzle = function(roomId, puzzle, callback) {
+exports.setWords = function(roomId, words, callback) {
 	var that = this;
 
 	_set.call(that, roomId, {
-		puzzle : puzzle
+		words : words
 	}, callback);
 }
 
-exports.getPuzzle = function(roomId, callback) {
+exports.getWords = function(roomId, callback) {
 	var that = this;
 
 	_get.call(that, 
 		roomId, 
-		'puzzle', 
+		'words', 
+		callback
+	);
+}
+
+exports.setCharacters = function(roomId, characters, callback) {
+	var that = this;
+
+	_set.call(that, roomId, {
+		characters : characters
+	}, callback);
+}
+
+exports.getCharacters = function(roomId, callback) {
+	var that = this;
+
+	_get.call(that, 
+		roomId, 
+		'characters', 
 		callback
 	);
 }

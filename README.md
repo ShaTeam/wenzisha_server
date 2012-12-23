@@ -74,3 +74,32 @@
 * @query {status} status
 
 （管理员权限）设置房间的状态
+
+### rooms/random-puzzle
+
+* @query {number} roomId
+* @query {string} adminId
+* @return 
+	* {Array} words
+
+（管理员权限）设置房间的状态
+
+### rooms/start-game
+
+* @query {number} roomId
+* @query {string} adminId
+* @query {string} words
+* @return 
+	* {number} status
+	* {object} characters
+
+（管理员权限）开始游戏
+
+### rooms/end-game
+
+* @query {number} roomId
+* @query {string} adminId
+* @return 
+	* {number} status
+
+（管理员权限）结束游戏
