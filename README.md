@@ -19,7 +19,7 @@
 * 2 - PUZZLE
 * 3 - GAME
 
-### rooms/open
+### room/open
 
 * @query {number} playerCount
 * @query {string=} adminId
@@ -29,7 +29,7 @@
 
 新开房间，如果不提供adminId，则创建一个管理员
 
-### rooms/join
+### room/join
 
 * @query {number} roomId
 * @query {string=} playerId
@@ -40,7 +40,7 @@
 
 加入房间，如不提供playerId，则创建一个玩家，并返回房间的当前人数
 
-### rooms/get-players
+### room/get-players
 
 * @query {number} roomId
 * @query {string} adminId
@@ -49,7 +49,7 @@
 
 （管理员权限）获取房间的玩家列表
 
-### rooms/get-amount
+### room/get-amount
 
 * @query {number} roomId
 * @query {string} playerId
@@ -58,7 +58,7 @@
 
 获取房间的玩家数
 
-### rooms/get-status
+### room/get-status
 
 * @query {number} roomId
 * @query {string} playerId
@@ -67,7 +67,7 @@
 
 获取房间的状态
 
-### rooms/set-status
+### room/set-status
 
 * @query {number} roomId
 * @query {string} adminId
@@ -75,7 +75,7 @@
 
 （管理员权限）设置房间的状态
 
-### rooms/random-puzzle
+### room/random-puzzle
 
 * @query {number} roomId
 * @query {string} adminId
@@ -84,7 +84,7 @@
 
 （管理员权限）设置房间的状态
 
-### rooms/start-game
+### room/start-game
 
 * @query {number} roomId
 * @query {string} adminId
@@ -95,7 +95,7 @@
 
 （管理员权限）开始游戏
 
-### rooms/end-game
+### room/end-game
 
 * @query {number} roomId
 * @query {string} adminId
@@ -103,3 +103,30 @@
 	* {number} status
 
 （管理员权限）结束游戏
+
+##  玩家相关接口
+
+### TYPE
+
+* 0 - ADMIN
+* 1 - NOT_AMDIN
+
+### CHARACTER
+
+* 1 - GOD
+* 2 - PEOPLE
+* 3 - ONI
+* 4 - IDIOT
+
+###	STATUS
+
+* 0 - IDLE
+* 1 - GAME
+
+### player/get
+
+* @query {string} playerId
+* @return
+	* @param {object} player
+
+获取玩家信息

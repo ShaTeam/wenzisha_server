@@ -23,6 +23,26 @@ exports.TYPE = TYPE;
 exports.CHARACTER = CHARACTER;
 exports.STATUS = STATUS;
 
+function checkExpire() {
+	var now = Date.now()
+		;
+
+	playersLCK.lockWrite(function(players) {
+		Object.each(players, function(playerLck, id) {
+			var player = playerLck.getData()
+				;
+
+			if (now - player.createdTime > ALIVE_TIME) {
+				playerLck.destory();
+				delete players[id];
+			}
+		});
+
+		playersLCK.unlockWrite();
+	});
+}
+setInterval(checkExpire, 24 * 60 * 60 * 1000);
+
 exports.create = function(isAdmin, callback) {
 	var that = this,
 		playerId = uuid.create().toString(),

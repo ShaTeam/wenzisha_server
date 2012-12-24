@@ -1,17 +1,37 @@
-var ALIVE_TIME = 60 * 60 * 1000* 2,
+var ALIVE_TIME = 60 * 60 * 1000 * 2,
 	STATUS = {
 		IDLE : 0,
 		OPENED : 1,
 		PUZZLE : 2,
 		GAME : 3
 	},
-	LIMIT = 1024,
+	LIMIT = 3,
 
 	locker = require('../libs/locker'),
 	roomsLCK = locker('rooms')
 	;
 
 exports.STATUS = STATUS;
+
+function checkExpire() {
+	var now = Date.now()
+		;
+
+	roomsLCK.lockWrite(function(rooms) {
+		Object.each(rooms, function(roomLck, id) {
+			var room = roomLck.getData()
+				;
+
+			if (now - room.createdTime > ALIVE_TIME) {
+				roomLck.destory();
+				delete rooms[id];
+			}
+		});
+
+		roomsLCK.unlockWrite();
+	});
+}
+setInterval(checkExpire, 60 * 60 * 1000);
 
 
 exports.create = function(playerCount, callback) {
@@ -28,13 +48,26 @@ exports.create = function(playerCount, callback) {
 		;
 
 	roomsLCK.lockWrite(function(rooms){
+		var earliest, roomLCK
+			;
+
 		for (var i = 1; i <= LIMIT; i++) {
 			roomId = '' + i;
-			if (!rooms[roomId]) {
+			if (!(roomLCK = rooms[roomId])) {
 				room.id = roomId;
 				rooms[roomId] = locker(roomId, room);
 				break;
+			} else if (!earliest ||
+				roomLCK.getData().createdTime < earliest.getData().createdTime) {
+				earliest = roomLCK;
 			}
+		}
+
+		if (i > LIMIT) {
+			roomId = earliest.getData().id;
+			room.id = roomId;
+			rooms[roomId].destory();
+			rooms[roomId] = locker(roomId, room);
 		}
 
 		roomsLCK.unlockWrite(function() {

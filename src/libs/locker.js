@@ -20,8 +20,6 @@ function Locker(id, data) {
 
 	that._id = id;
 	that._data = data || {};
-	// that._readLocker = path.join(lockPath, id + '-read.lock');
-	// that._writeLocker = path.join(lockPath, id + '-write.lock');
 	that._readLocker = false;
 	that._writeLocker = false;
 	that._mode = NON_LOCK;
@@ -37,25 +35,8 @@ Locker.prototype.lockRead = function(callback) {
 
 	if (that._mode === READ_LOCK)  {
 		that._reading++;
-		callback.call(that, that._data);
+		callback && callback.call(that, that._data);
 	} else {
-		// if (lockfile.checkSync(readLocker)) {
-		// 	process.nextTick(function() {
-		// 		args.callee.apply(that, args);
-		// 	})
-		// 	return;
-		// }
-
-		// lockfile.lock(readLocker, {
-		// 	wait : LOCK_WAIT
-		// }, function(err, fd) {
-		// 	if (err) throw err;
-
-		// 	that._mode = READ_LOCK;
-		// 	that._reading++;
-		// 	callback.call(that, that._data);
-		// });
-
 		if (readLocker) {
 			process.nextTick(function() {
 				args.callee.apply(that, args);
@@ -66,7 +47,7 @@ Locker.prototype.lockRead = function(callback) {
 		that._readLocker = true;
 		that._mode = READ_LOCK;
 		that._reading++;
-		callback.call(that, data);
+		callback && callback.call(that, data);
 	}
 }
 
@@ -81,16 +62,9 @@ Locker.prototype.unlockRead = function(callback) {
 
 	if ((--that._reading) > 0) return;
 
-	// lockfile.unlock(readLocker, function(err) {
-	// 	if (err) throw err;
-
-	// 	that._mode = NON_LOCK;
-	// 	callback.call(that);
-	// });
-
 	that._readLocker = false;
 	that._mode = NON_LOCK;
-	callback.call(that);
+	callback && callback.call(that);
 }
 
 Locker.prototype.lockWrite = function(callback) {
@@ -100,29 +74,6 @@ Locker.prototype.lockWrite = function(callback) {
 		readLocker = that._readLocker,
 		writeLocker = that._writeLocker
 		;
-
-	// if (lockfile.checkSync(readLocker) ||
-	// 		lockfile.checkSync(writeLocker)) {
-	// 	process.nextTick(function() {
-	// 		args.callee.apply(that, args);
-	// 	});
-	// 	return;
-	// }
-
-	// lockfile.lock(readLocker, {
-	// 	wait : LOCK_WAIT
-	// }, function(err, fd) {
-	// 	if (err) throw err;
-		
-	// 	lockfile.lock(writeLocker, {
-	// 		wait : LOCK_WAIT
-	// 	}, function(err, fd) {
-	// 		if (err) throw err;
-
-	// 		that._mode = WRITE_LOCK;
-	// 		callback.call(that, that._data);
-	// 	});
-	// });
 
 	if (readLocker || writeLocker) {
 		process.nextTick(function() {
@@ -134,7 +85,7 @@ Locker.prototype.lockWrite = function(callback) {
 	that._readLocker = true;
 	that._writeLocker = true;
 	that._mode = WRITE_LOCK;
-	callback.call(that, data);
+	callback && callback.call(that, data);
 }
 
 Locker.prototype.unlockWrite = function(callback) {
@@ -146,21 +97,10 @@ Locker.prototype.unlockWrite = function(callback) {
 	if (that._mode !== WRITE_LOCK) 
 		throw new Error('can\'t unlock under non-lock or read-lock mode');
 
-	// lockfile.unlock(writeLocker, function(err) {
-	// 	if (err) throw err;
-
-	// 	lockfile.unlock(readLocker, function(err) {
-	// 		if (err) throw err;
-
-	// 		that._mode = NON_LOCK;
-	// 		callback.call(that);
-	// 	});	
-	// });
-
 	that._writeLocker = false;
 	that._readLocker = false;
 	that._mode = NON_LOCK;
-	callback.call(that);
+	callback && callback.call(that);
 }
 
 Locker.prototype.getData = function() {
@@ -168,6 +108,21 @@ Locker.prototype.getData = function() {
 		;
 
 	return that._data;
+}
+
+Locker.prototype.destory = function() {
+	var that = this,
+		id = that._id,
+		mode = that._mode
+		;
+
+	if (mode === WRITE_LOCK) {
+		that.unlockWrite();
+	} else if (mode === READ_LOCK) {
+		that.unlockRead();
+	}
+	delete that._data;
+	delete lockers[id];
 }
 
 module.exports = function(id, data) {
