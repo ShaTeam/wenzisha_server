@@ -1,10 +1,5 @@
 var path = require('path'),
-
-	lockPath = path.join(__dirname, '..', 'lock'),
-	lockfile = require('lockfile'),
 	lockers = {},
-	LOCK_WAIT = 10 * 1000,
-
 	NON_LOCK = 0
 	READ_LOCK = 1,
 	WRITE_LOCK = 2
