@@ -1,5 +1,4 @@
-var path = require('path'),
-	lockers = {},
+var lockers = {},
 	NON_LOCK = 0
 	READ_LOCK = 1,
 	WRITE_LOCK = 2

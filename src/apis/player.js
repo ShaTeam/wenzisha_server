@@ -1,4 +1,4 @@
-var Sequence = require('../libs/sequence'),
+var Sequence = require('func-sequence'),
 	players = require('../datas/players'),
 	puzzles = require('../datas/puzzles'),
 	Result = require('./result')
