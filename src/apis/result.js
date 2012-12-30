@@ -42,7 +42,7 @@ Result.prototype._end = function() {
 		;
 		
 	result.endTimestamp = Date.now();
-	res.json(result);
+	res.jsonp(result);
 }
 
 
