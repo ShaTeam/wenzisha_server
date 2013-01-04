@@ -31,7 +31,9 @@ function joinRoom(data) {
 	rooms.join(roomId, playerId, function(playerAmount) {
 		seq.next({
 			playerAmount : playerAmount,
-			playerStatus : players.STATUS.GAME
+			playerStatus : players.STATUS.JOIN,
+			character : players.CHARACTER.UNKOWN,
+			word : null
 		});
 	});
 }
@@ -45,7 +47,9 @@ function exitRoom(data) {
 	rooms.exit(roomId, playerId, function() {
 		seq.next({
 			roomId : 0,
-			playerStatus : players.STATUS.IDLE
+			playerStatus : players.STATUS.IDLE,
+			character :  players.CHARACTER.UNKOWN,
+			word : null
 		});
 	});
 }
@@ -169,7 +173,9 @@ function assignCharacter(data) {
 
 	Object.each(rule, function(count, character) {
 		characters[character].count = count;
-	})
+	});
+
+	delete rule['god'];
 
 	function done(data) {
 		seq.next({
@@ -214,15 +220,19 @@ function assignCharacter(data) {
 		switch(character) {
 			case 'people':
 				word = words[0];
+				character = players.CHARACTER.PEOPLE;
 				break;
 			case 'oni':
 				word = words[0].length + '个字';
+				character = players.CHARACTER.ONI;
 				break;
 			case 'idiot':
 				word = words[1];
+				character = players.CHARACTER.IDIOT;
 				break;
-			default:
+			case 'god':
 				word = 'I\'m god';
+				character = players.CHARACTER.GOD;
 				break;
 		}
 
@@ -240,6 +250,7 @@ function assignCharacter(data) {
 	subSeq.next();
 
 }
+
 
 function getPlayers(data) {
 	var seq = this,
@@ -271,12 +282,62 @@ function getPlayers(data) {
 	subSeq.next();
 }
 
-function createPlayer(data) {
+function setPlayersGame(data) {
 	var seq = this,
-		isAdmin = data.isAdmin
+		playerId = data.playerId,
+		playersRef = data.playersRef,
+		subSeq
 		;
 
-	players.create(isAdmin, function(playerId) {
+	function done(data) {
+		seq.next();
+	}
+
+	subSeq = new Sequence(done);
+
+	Object.each(playersRef, function(playerId, index) {
+		subSeq.push(setPlayerStatus, {playerId : playerId});
+	});
+
+	subSeq.push(subSeq.done);
+	
+	subSeq.next({playerStatus : players.STATUS.GAME});
+}
+
+function setPlayersIdle(data) {
+	var seq = this,
+		playerId = data.playerId,
+		playersRef = data.playersRef,
+		subSeq
+		;
+
+	function done(data) {
+		seq.next();
+	}
+
+	subSeq = new Sequence(done);
+
+	Object.each(playersRef, function(playerId, index) {
+		subSeq.push(setPlayerStatus, {playerId : playerId});
+		subSeq.push(setPlayerCharacter);
+		subSeq.push(setPlayerWord);
+	});
+
+	subSeq.push(subSeq.done);
+	
+	subSeq.next({
+		playerStatus : players.STATUS.IDLE,
+		character :  players.CHARACTER.UNKOWN,
+		word : null,
+	});
+}
+
+
+function createPlayer(data) {
+	var seq = this
+		;
+
+	players.create(function(playerId) {
 		seq.next({
 			playerId : playerId
 		});
@@ -290,6 +351,18 @@ function setPlayerRoom(data) {
 		;
 
 	players.setRoomId(playerId, roomId, function() {
+		seq.next();
+	});
+}
+
+
+function setPlayerType(data) {
+	var seq = this,
+		playerId = data.playerId,
+		isAdmin = data.isAdmin
+		;
+
+	players.setType(playerId, isAdmin, function() {
 		seq.next();
 	});
 }
@@ -387,7 +460,7 @@ exports.open = function(req, res) {
 	var result = new Result(req, res),
 		query = req.query,
 		data = {
-			playerCount : query.playerCount,
+			playerCount : parseInt(query.playerCount || 13),
 			playerId : query.adminId,
 			isAdmin : true,
 			roomId : null,
@@ -418,6 +491,8 @@ exports.open = function(req, res) {
 	seq.push(createRoom);
 
 	seq.push(joinRoom);
+
+	seq.push(setPlayerType);
 
 	seq.push(setPlayerRoom);
 
@@ -473,9 +548,15 @@ exports.join = function(req, res) {
 
 	seq.push(joinRoom);
 
+	seq.push(setPlayerType);
+
 	seq.push(setPlayerRoom);
 
 	seq.push(setPlayerStatus);
+
+	seq.push(setPlayerCharacter);
+
+	seq.push(setPlayerWord);
 
 	seq.push(seq.done);
 
@@ -517,6 +598,10 @@ exports.exit = function(req, res) {
 	seq.push(setPlayerRoom);
 
 	seq.push(setPlayerStatus);
+
+	seq.push(setPlayerCharacter);
+
+	seq.push(setPlayerWord);
 
 	seq.push(seq.done);
 
@@ -749,7 +834,7 @@ exports['random-puzzle'] = function(req, res) {
  * @query {string} words
  * @return {status: [number], characters: [object]}
  */
-exports['start-game'] = function(req, res) {
+exports['set-puzzle'] = function(req, res) {
 	var result = new Result(req, res),
 		query = req.query,
 		data = {
@@ -774,7 +859,7 @@ exports['start-game'] = function(req, res) {
 					playersRef : []
 				}
 			},
-			status : rooms.STATUS.GAME
+			status : rooms.STATUS.PUZZLE
 		},
 		
 		seq
@@ -819,15 +904,60 @@ exports['start-game'] = function(req, res) {
  * @query {string} adminId
  * @return {status: [number]}
  */
+exports['start-game'] = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
+		data = {
+			roomId : query.roomId,
+			playerId : query.adminId,
+			status : rooms.STATUS.GAME
+		},
+		
+		seq
+		;
+
+	function done(data) {
+		result.ok({
+			status : data.status
+		});
+	}
+
+	function exit(data) {
+		var error = data.error;
+		result[error]();
+	}
+
+	seq = new Sequence(done, exit);
+
+	seq.push(checkIfIsAdmin);
+
+	seq.push(checkIfHasRoom);
+
+	seq.push(getPlayersRef);
+
+	seq.push(setPlayersGame);
+
+	seq.push(setRoomStatus);
+
+	seq.push(seq.done);
+
+	seq.next(data);
+}
+
+/**
+ * @query {number} roomId
+ * @query {string} adminId
+ * @return {status: [number]}
+ */
 exports['end-game'] = function(req, res) {
 	var result = new Result(req, res),
 		query = req.query,
 		data = {
 			roomId : query.roomId,
 			playerId : query.adminId,
+			status : rooms.STATUS.IDLE,
 			words : null,
-			character : null,
-			status : rooms.STATUS.IDLE
+			character : null
 		},
 		seq
 		;
@@ -849,7 +979,9 @@ exports['end-game'] = function(req, res) {
 
 	seq.push(checkIfHasRoom);
 
-	seq.push(checkIfHasPermission);
+	seq.push(getPlayersRef);
+
+	seq.push(setPlayersIdle);
 
 	seq.push(setRoomStatus);
 

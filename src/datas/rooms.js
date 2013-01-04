@@ -1,11 +1,11 @@
 var ALIVE_TIME = 60 * 60 * 1000 * 2,
 	STATUS = {
 		IDLE : 0,
-		OPENED : 1,
+		OPEN : 1,
 		PUZZLE : 2,
 		GAME : 3
 	},
-	LIMIT = 3,
+	LIMIT = 1024,
 
 	locker = require('../libs/locker'),
 	roomsLCK = locker('rooms')
@@ -39,7 +39,7 @@ exports.create = function(playerCount, callback) {
 		room = {
 			playerCount : playerCount,
 			playersRef : [],
-			status : STATUS.OPENED,
+			status : STATUS.OPEN,
 			words : null,
 			characters : null,
 			createdTime : Date.now()

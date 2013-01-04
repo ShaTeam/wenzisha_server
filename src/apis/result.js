@@ -9,6 +9,7 @@ var CODE = {
 		FULL_ROOM : 1 << 2,
 		NOT_ADMIN : 1 << 3,
 		NO_PERMISSION : 1 << 4,
+		NOT_JOIN : 1 << 5,
 		UNKNOW : 1 << 10
 	}
 	;
@@ -106,6 +107,19 @@ Result.prototype.no_permission_error = function() {
 	Object.extend(result, {
 		code : CODE.ERROR,
 		reason : REASON.NO_PERMISSION
+	});
+
+	that._end();
+}
+
+Result.prototype.not_join_error = function() {
+	var that = this,
+		result = that._result
+		;
+
+	Object.extend(result, {
+		code : CODE.ERROR,
+		reason : REASON.NOT_JOIN
 	});
 
 	that._end();

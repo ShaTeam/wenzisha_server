@@ -1,6 +1,5 @@
 var Sequence = require('func-sequence'),
 	players = require('../datas/players'),
-	puzzles = require('../datas/puzzles'),
 	Result = require('./result')
 	;
 
@@ -28,6 +27,55 @@ function getPlayer(data) {
 			player : player
 		});
 	});
+}
+
+function checkIfIsJoin(data) {
+	var seq = this,
+		playerId = data.playerId
+		;
+
+	players.getStatus(playerId, function(status) {
+		if (status === players.STATUS.JOIN) {
+			seq.next();
+		} else {
+			seq.exit({error : 'not_join_error'});
+		}
+	});		
+}
+
+function getWord(data) {
+	var seq = this,
+		playerId = data.playerId
+		;
+
+	players.getWord(playerId, function(word) {
+		seq.next({
+			word : word
+		});
+	});	
+}
+
+function getCharacter(data) {
+	var seq = this,
+		playerId = data.playerId
+		;
+
+	players.getCharacter(playerId, function(character) {
+		seq.next({
+			character : character
+		});
+	});	
+}
+
+function setPlayerStatus(data) {
+	var seq = this,
+		playerId = data.playerId,
+		playerStatus = data.playerStatus
+		;
+
+	players.setStatus(playerId, playerStatus, function() {
+		seq.next();
+	})
 }
 
 /**
@@ -60,6 +108,52 @@ exports.get = function(req, res) {
 	seq.push(checkIfHasPlayer);
 
 	seq.push(getPlayer);
+
+	seq.push(seq.done);
+
+	seq.next(data);
+}
+
+
+/**
+ * @query {string} playerId
+ * @return {word : [string], character : [number]}
+ */
+exports['get-puzzle'] = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
+		data = {
+			playerId : query.playerId,
+			playerStatus : players.STATUS.PUZZLE,
+			word : null,
+			character : null
+		},
+		seq
+		;
+
+	function done(data) {
+		result.ok({
+			word : data.word,
+			character : data.character
+		});
+	}
+
+	function exit(data) {
+		var error = data.error;
+		result[error]();
+	}
+
+	seq = new Sequence(done, exit);
+
+	seq.push(checkIfHasPlayer);
+
+	seq.push(checkIfIsJoin);
+
+	seq.push(setPlayerStatus);
+
+	seq.push(getWord);
+
+	seq.push(getCharacter);
 
 	seq.push(seq.done);
 

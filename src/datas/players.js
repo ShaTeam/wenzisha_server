@@ -1,9 +1,11 @@
 var ALIVE_TIME = 24 * 60 * 60 * 1000 * 2,
 	TYPE = {
-		ADMIN : 0,
-		NOT_AMDIN : 1
+		UNKOWN : 0,
+		ADMIN : 1,
+		NOT_AMDIN : 2
 	},
 	CHARACTER = {
+		UNKOWN : 0,
 		GOD : 1,
 		PEOPLE : 2,
 		ONI : 3,
@@ -11,7 +13,9 @@ var ALIVE_TIME = 24 * 60 * 60 * 1000 * 2,
 	},
 	STATUS = {
 		IDLE : 0,
-		GAME : 1
+		JOIN : 1,
+		PUZZLE : 2, 
+		GAME : 3
 	},
 
 	uuid = require('uuid-js'),
@@ -43,14 +47,14 @@ function checkExpire() {
 }
 setInterval(checkExpire, 24 * 60 * 60 * 1000);
 
-exports.create = function(isAdmin, callback) {
+exports.create = function(callback) {
 	var that = this,
 		playerId = uuid.create().toString(),
 		player = {
 			id : playerId,
-			type : isAdmin ? TYPE.ADMIN : TYPE.NOT_AMDIN,
+			type : TYPE.UNKOWN,
 			roomId : 0,
-			character : 0,
+			character : CHARACTER.UNKOWN,
 			status : STATUS.IDLE,
 			word : null,
 			createdTime : Date.now()
@@ -163,7 +167,14 @@ exports.isAdmin = function(playerId, callback) {
 			callback(type === TYPE.ADMIN);
 		}
 	)
-	
+}
+
+exports.setType = function(playerId, isAdmin, callback) {
+	var that = this;
+
+	_set.call(that, playerId, {
+		type : isAdmin ? TYPE.ADMIN : TYPE.NOT_AMDIN
+	}, callback);
 }
 
 exports.getRoomId = function(playerId, callback) {

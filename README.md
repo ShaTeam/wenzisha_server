@@ -7,6 +7,7 @@
 	* 4 - 房间已满
 	* 8 - 当前playerId指向的不是管理员
 	* 16 - 当前playerId没有权限（不是Room的成员）
+	* 32 - 当前playerId不是JOIN的状态
 	* 1024 - 未知错误
 
 
@@ -15,7 +16,7 @@
 ### STATUS
 	
 * 0 - IDLE
-* 1 - OPENED
+* 1 - OPEN
 * 2 - PUZZLE
 * 3 - GAME
 
@@ -67,14 +68,6 @@
 
 获取房间的状态
 
-### room/set-status
-
-* @query {number} roomId
-* @query {string} adminId
-* @query {status} status
-
-（管理员权限）设置房间的状态
-
 ### room/random-puzzle
 
 * @query {number} roomId
@@ -84,7 +77,7 @@
 
 （管理员权限）设置房间的状态
 
-### room/start-game
+### room/set-puzzle
 
 * @query {number} roomId
 * @query {string} adminId
@@ -92,6 +85,15 @@
 * @return 
 	* {number} status
 	* {object} characters
+
+（管理员权限）设置题目
+
+### room/start-game
+
+* @query {number} roomId
+* @query {string} adminId
+* @return 
+	* {number} status
 
 （管理员权限）开始游戏
 
@@ -108,25 +110,50 @@
 
 ### TYPE
 
-* 0 - ADMIN
-* 1 - NOT_AMDIN
+* 0 - UNKOWN
+* 1 - ADMIN
+* 2 - NOT_AMDIN
 
 ### CHARACTER
 
+* 0 - UNKOWN
 * 1 - GOD
 * 2 - PEOPLE
 * 3 - ONI
 * 4 - IDIOT
 
-###	STATUS
+### STATUS
 
 * 0 - IDLE
-* 1 - GAME
+* 1 - JOIN
+* 2 - PUZZLE
+* 3 - GAME
 
-### player/get
+### player/getPuzzle
 
 * @query {string} playerId
 * @return
-	* @param {object} player
+	* @param {string} word
+	* @param {number} character
 
-获取玩家信息
+获取玩家被分配的题目和角色
+
+## 游戏流程接口说明
+
+### 管理员流程
+
+1. 创建房间，此时房间的status变为OPEN - room/open 
+2. 等待所有人加入，即当前玩家数（playerAmount）等于需要的玩家数量(playerCount) - room/get-amount
+3. 出题，并分配玩家角色，此时房间的status变为PUZZLE - room/set-puzzle
+	1. 可以随机选题 - room/random-puzzle
+4. 等待所有玩家获取卡片，即当所有玩家的status均为PUZZLE - room/get-players
+5. 开始游戏，此时玩家的status变为GAME，房间的status变为GAME
+6. 结束游戏，并清空题目和角色，此时玩家的status变为IDLE，房间的status变为IDLE
+
+### 玩家流程
+
+1. 加入房间，此时玩家的status变为JOIN  - room/join
+2. 等待出题，即当房间的status为PUZZLE，并跳转到获取题目页面 - room/getStatus
+3. 获取题目和角色，此时玩家的status变为PUZZLE - player/getPuzzle
+4. 等待开始游戏，即当房间的status为GAME，并跳转到开始游戏页面 - room/getStatus
+5. 等待结束游戏，即当房间的status为IDLE，并跳转会初始页面 - room/getStatus
