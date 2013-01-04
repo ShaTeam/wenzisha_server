@@ -223,7 +223,7 @@ function assignCharacter(data) {
 				character = players.CHARACTER.PEOPLE;
 				break;
 			case 'oni':
-				word = words[0].length + '个字';
+				word = words[0].length + '';
 				character = players.CHARACTER.ONI;
 				break;
 			case 'idiot':
