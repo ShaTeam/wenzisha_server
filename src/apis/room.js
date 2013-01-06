@@ -163,10 +163,10 @@ function assignCharacter(data) {
 	var seq = this,
 		adminId = data.playerId,
 		playersRef = data.playersRef.splice(0),
-		playerCount = data.playerCount,
+		playerAmount = playersRef.length,
 		characters = data.characters,
 		words = data.words,
-		rule = puzzles.rule(playerCount),
+		rule = puzzles.rule(playerAmount),
 		playerRef, character, word,
 		subSeq
 		;
