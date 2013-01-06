@@ -56,7 +56,7 @@ exports.create = function(callback) {
 			roomId : 0,
 			character : CHARACTER.UNKOWN,
 			status : STATUS.IDLE,
-			word : null,
+			word : '',
 			createdTime : Date.now()
 		}
 		;

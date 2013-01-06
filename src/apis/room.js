@@ -172,7 +172,11 @@ function assignCharacter(data) {
 		;
 
 	Object.each(rule, function(count, character) {
-		characters[character].count = count;
+		if (count) {
+			characters[character].count = count;
+		} else {
+			delete rule[character];
+		}
 	});
 
 	delete rule['god'];
@@ -460,7 +464,7 @@ exports.open = function(req, res) {
 	var result = new Result(req, res),
 		query = req.query,
 		data = {
-			playerCount : parseInt(query.playerCount || 13),
+			playerCount : parseInt(query.playerCount || 1024),
 			playerId : query.adminId,
 			isAdmin : true,
 			roomId : null,

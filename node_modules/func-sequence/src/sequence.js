@@ -64,12 +64,9 @@ Sequence.prototype.push = function(func, funcElse, data) {
 	return that;
 }
 
-function _next(_data, func) {
-	var that = this,
-		data = that._data
+function _next(data, func) {
+	var that = this
 		;
-
-	extend(data, _data);
 
 	if (func) {
 		func.call(that, data);
@@ -86,10 +83,8 @@ Sequence.prototype.next = function(_data) {
 		opt = list.shift(),
 		func = opt.func,
 		condition = opt.condition,
-		data = opt.data || {}
+		data = extend(that._data, opt.data || {}, _data)
 		;
-
-	extend(data, _data);
 
 	if ((typeof condition === 'function' && 
 		!condition.call(that, data)) || 
@@ -107,10 +102,8 @@ Sequence.prototype.nextElse = function(_data) {
 		list = that._list,
 		opt = list.shift(),
 		func = opt.funcElse || opt.func,
-		data = opt.data || {}
+		data = extend(that._data, opt.data || {}, _data)
 		;
-
-	extend(data, _data);
 
 	return _next.call(that, data, func);
 }

@@ -125,8 +125,8 @@ exports['get-puzzle'] = function(req, res) {
 		data = {
 			playerId : query.playerId,
 			playerStatus : players.STATUS.PUZZLE,
-			word : null,
-			character : null
+			word : '',
+			character : players.CHARACTER.UNKOWN
 		},
 		seq
 		;
@@ -147,13 +147,19 @@ exports['get-puzzle'] = function(req, res) {
 
 	seq.push(checkIfHasPlayer);
 
-	seq.push(checkIfIsJoin);
-
-	seq.push(setPlayerStatus);
+	seq.push(checkIfIsJoin);	
 
 	seq.push(getWord);
 
 	seq.push(getCharacter);
+
+	seq.push({
+		func : setPlayerStatus,
+		funcElse : seq.done,
+		condition : function(data) {
+			return (!!data.word && !!data.character);
+		}
+	});
 
 	seq.push(seq.done);
 
