@@ -1,13 +1,6 @@
-var express = require('express'),
-	app = express(),
-	port = 88
-	;
-
 require('./src/libs/reset');
 
-app.use(express.logger());
-
-app.get('/:name/:action/?', function(req, res, next) {
+module.exports = function(req, res, next) {
 	var name = req.params.name,
 		action = req.params.action,
 		controller = require('./src/apis/' + name)
@@ -15,7 +8,4 @@ app.get('/:name/:action/?', function(req, res, next) {
 
 	res.set('Content-Type', 'text/plain; charset=utf-8');
 	controller[action](req, res);
-});
-
-app.listen(port);
-console.log('start at port ' + port);
+}
