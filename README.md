@@ -84,7 +84,6 @@
 * @query {string} words
 * @return 
 	* {number} status
-	* {object} characters
 
 （管理员权限）设置题目
 
@@ -94,8 +93,9 @@
 * @query {string} adminId
 * @return 
 	* {number} status
+	* {object} characters
 
-（管理员权限）开始游戏
+（管理员权限）开始游戏，并分配角色
 
 ### room/end-game
 
@@ -143,17 +143,15 @@
 ### 管理员流程
 
 1. 创建房间，此时房间的status变为OPEN - room/open 
-2. 等待所有人加入，即当前玩家数（playerAmount）等于需要的玩家数量(playerCount) - room/get-amount
-3. 出题，并分配玩家角色，此时房间的status变为PUZZLE - room/set-puzzle
+2. 出题，此时房间的status变为PUZZLE - room/set-puzzle
 	* 可以随机选题 - room/random-puzzle
-4. 等待所有玩家获取卡片，即当所有玩家的status均为PUZZLE - room/get-players
+4. 等待所有玩家进入房间 - room/get-amount
 5. 开始游戏，此时玩家的status变为GAME，房间的status变为GAME
 6. 结束游戏，并清空题目和角色，此时玩家的status变为IDLE，房间的status变为IDLE
 
 ### 玩家流程
 
 1. 加入房间，此时玩家的status变为JOIN  - room/join
-2. 等待出题，即当房间的status为PUZZLE，并跳转到获取题目页面 - room/getStatus
-3. 获取题目和角色，此时玩家的status变为PUZZLE - player/getPuzzle
-4. 等待开始游戏，即当房间的status为GAME，并跳转到开始游戏页面 - room/getStatus
+2. 等待开始游戏，即当房间的status为GAME - room/getStatus
+3. 获取题目和角色 - player/getPuzzle
 5. 等待结束游戏，即当房间的status为IDLE，并跳转会初始页面 - room/getStatus

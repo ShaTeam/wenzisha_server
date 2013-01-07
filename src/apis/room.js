@@ -137,6 +137,19 @@ function setRoomStatus(data) {
 	});
 }
 
+function getRoomWords(data) {
+	var seq = this,
+		roomId = data.roomId
+		;
+
+	rooms.getWords(roomId, function(words) {
+		seq.next({
+			words : words
+		});
+	});
+}
+
+
 function setRoomWords(data) {
 	var seq = this,
 		roomId = data.roomId,
@@ -162,7 +175,7 @@ function setRoomCharacters(data) {
 function assignCharacter(data) {
 	var seq = this,
 		adminId = data.playerId,
-		playersRef = data.playersRef.splice(0),
+		playersRef = data.playersRef.slice(),
 		playerAmount = playersRef.length,
 		characters = data.characters,
 		words = data.words,
@@ -194,7 +207,7 @@ function assignCharacter(data) {
 			playerRef = playersRef.splice(index, 1)
 			;
 
-		return playerRef;
+		return playerRef[0];
 	}
 
 	function pickCharacter() {
@@ -299,6 +312,8 @@ function setPlayersGame(data) {
 
 	subSeq = new Sequence(done);
 
+	console.log(playersRef);
+
 	Object.each(playersRef, function(playerId, index) {
 		subSeq.push(setPlayerStatus, {playerId : playerId});
 	});
@@ -376,6 +391,8 @@ function setPlayerStatus(data) {
 		playerId = data.playerId,
 		playerStatus = data.playerStatus
 		;
+
+	console.log(playerId, playerStatus);
 
 	players.setStatus(playerId, playerStatus, function() {
 		seq.next();
@@ -836,7 +853,7 @@ exports['random-puzzle'] = function(req, res) {
  * @query {number} roomId
  * @query {string} adminId
  * @query {string} words
- * @return {status: [number], characters: [object]}
+ * @return {status: [number]}
  */
 exports['set-puzzle'] = function(req, res) {
 	var result = new Result(req, res),
@@ -845,6 +862,52 @@ exports['set-puzzle'] = function(req, res) {
 			roomId : query.roomId,
 			playerId : query.adminId,
 			words : query.words.split(','),
+			status : rooms.STATUS.PUZZLE
+		},
+		
+		seq
+		;
+
+	function done(data) {
+		result.ok({
+			status : data.status
+		});
+	}
+
+	function exit(data) {
+		var error = data.error;
+		result[error]();
+	}
+
+	seq = new Sequence(done, exit);
+
+	seq.push(checkIfIsAdmin);
+
+	seq.push(checkIfHasRoom);
+
+	seq.push(checkIfHasPermission);
+
+	seq.push(setRoomWords);
+
+	seq.push(setRoomStatus);
+
+	seq.push(seq.done);
+
+	seq.next(data);
+}
+
+
+/**
+ * @query {number} roomId
+ * @query {string} adminId
+ * @return {status: [number], characters: [object]}
+ */
+exports['start-game'] = function(req, res) {
+	var result = new Result(req, res),
+		query = req.query,
+		data = {
+			roomId : query.roomId,
+			playerId : query.adminId,
 			characters : {
 				god : {
 					count : 0,
@@ -863,7 +926,7 @@ exports['set-puzzle'] = function(req, res) {
 					playersRef : []
 				}
 			},
-			status : rooms.STATUS.PUZZLE
+			status : rooms.STATUS.GAME
 		},
 		
 		seq
@@ -889,59 +952,15 @@ exports['set-puzzle'] = function(req, res) {
 
 	seq.push(getPlayersRef);
 
+	seq.push(getRoomWords);
+
 	seq.push(assignCharacter);
 
 	seq.push(setRoomStatus);
 
-	seq.push(setRoomWords);
-
 	seq.push(setRoomCharacters);
 
-	seq.push(seq.done);
-
-	seq.next(data);
-}
-
-
-/**
- * @query {number} roomId
- * @query {string} adminId
- * @return {status: [number]}
- */
-exports['start-game'] = function(req, res) {
-	var result = new Result(req, res),
-		query = req.query,
-		data = {
-			roomId : query.roomId,
-			playerId : query.adminId,
-			status : rooms.STATUS.GAME
-		},
-		
-		seq
-		;
-
-	function done(data) {
-		result.ok({
-			status : data.status
-		});
-	}
-
-	function exit(data) {
-		var error = data.error;
-		result[error]();
-	}
-
-	seq = new Sequence(done, exit);
-
-	seq.push(checkIfIsAdmin);
-
-	seq.push(checkIfHasRoom);
-
-	seq.push(getPlayersRef);
-
 	seq.push(setPlayersGame);
-
-	seq.push(setRoomStatus);
 
 	seq.push(seq.done);
 

@@ -29,20 +29,6 @@ function getPlayer(data) {
 	});
 }
 
-function checkIfIsJoin(data) {
-	var seq = this,
-		playerId = data.playerId
-		;
-
-	players.getStatus(playerId, function(status) {
-		if (status === players.STATUS.JOIN) {
-			seq.next();
-		} else {
-			seq.exit({error : 'not_join_error'});
-		}
-	});		
-}
-
 function getWord(data) {
 	var seq = this,
 		playerId = data.playerId
@@ -65,17 +51,6 @@ function getCharacter(data) {
 			character : character
 		});
 	});	
-}
-
-function setPlayerStatus(data) {
-	var seq = this,
-		playerId = data.playerId,
-		playerStatus = data.playerStatus
-		;
-
-	players.setStatus(playerId, playerStatus, function() {
-		seq.next();
-	})
 }
 
 /**
@@ -147,19 +122,9 @@ exports['get-puzzle'] = function(req, res) {
 
 	seq.push(checkIfHasPlayer);
 
-	seq.push(checkIfIsJoin);	
-
 	seq.push(getWord);
 
 	seq.push(getCharacter);
-
-	seq.push({
-		func : setPlayerStatus,
-		funcElse : seq.done,
-		condition : function(data) {
-			return (!!data.word && !!data.character);
-		}
-	});
 
 	seq.push(seq.done);
 
