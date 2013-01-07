@@ -312,8 +312,6 @@ function setPlayersGame(data) {
 
 	subSeq = new Sequence(done);
 
-	console.log(playersRef);
-
 	Object.each(playersRef, function(playerId, index) {
 		subSeq.push(setPlayerStatus, {playerId : playerId});
 	});
@@ -391,8 +389,6 @@ function setPlayerStatus(data) {
 		playerId = data.playerId,
 		playerStatus = data.playerStatus
 		;
-
-	console.log(playerId, playerStatus);
 
 	players.setStatus(playerId, playerStatus, function() {
 		seq.next();
