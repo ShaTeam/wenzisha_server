@@ -904,6 +904,7 @@ exports['start-game'] = function(req, res) {
 		data = {
 			roomId : query.roomId,
 			playerId : query.adminId,
+			words : query.words.split(','),
 			characters : {
 				god : {
 					count : 0,
@@ -948,7 +949,7 @@ exports['start-game'] = function(req, res) {
 
 	seq.push(getPlayersRef);
 
-	seq.push(getRoomWords);
+	seq.push(setRoomWords);
 
 	seq.push(assignCharacter);
 
